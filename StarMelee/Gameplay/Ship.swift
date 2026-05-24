@@ -232,6 +232,15 @@ final class Ship: SKNode {
 
     var isDestroyed: Bool { health <= 0 }
 
+    // MARK: - Module-internal write accessors
+    // Used by PowerUp collection (which lives in a separate file) so we don't have to drop
+    // the `private(set)` guard on health/shield for the wider module.
+
+    var healthInternal: CGFloat { health }
+    var shieldInternal: CGFloat { shield }
+    func setHealth(_ v: CGFloat) { health = v }
+    func setShield(_ v: CGFloat) { shield = v }
+
     var healthFraction: CGFloat { maxHealth > 0 ? health / maxHealth : 0 }
     var shieldFraction: CGFloat { maxShield > 0 ? shield / maxShield : 0 }
     var batteryFraction: CGFloat { maxBattery > 0 ? battery / maxBattery : 0 }

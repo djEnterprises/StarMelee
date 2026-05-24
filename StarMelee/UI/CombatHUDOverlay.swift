@@ -13,14 +13,18 @@ struct CombatHUDOverlay: View {
 
     var body: some View {
         ZStack {
-            // Top stat bars + center match info
+            // Top stat bars + center match info, with the tactical minimap docked under the
+            // enemy panel on the right (Section 4 placement rule).
             VStack {
                 HStack(alignment: .top, spacing: 16) {
                     playerPanel
                     Spacer()
                     matchCenterPanel
                     Spacer()
-                    enemyPanel
+                    VStack(alignment: .trailing, spacing: 6) {
+                        enemyPanel
+                        MinimapView(gameState: gameState)
+                    }
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 14)

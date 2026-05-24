@@ -1,18 +1,18 @@
 import SwiftUI
 import SpriteKit
 
-/// SwiftUI host for `CombatScene`. Composes the SpriteKit view, the HUD overlay,
-/// and the touch controls (analog joystick + 6-button cluster).
+/// SwiftUI host for `CombatScene`. Composes the SpriteKit view, the HUD overlay, the touch
+/// controls, the series-end overlay, and (on Mac Catalyst / hardware keyboards) keyboard input.
 struct CombatSceneView: View {
     let playerShipID: String
 
     @StateObject private var input = InputState()
     @StateObject private var gameState = GameState()
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var sceneFocused: Bool
 
     var body: some View {
         ZStack {
-            // SpriteKit scene fills the entire viewport.
             SpriteView(
                 scene: makeScene(),
                 options: [.ignoresSiblingOrder],
@@ -20,22 +20,19 @@ struct CombatSceneView: View {
             )
             .ignoresSafeArea()
 
-            // HUD — read-only overlay, never blocks input.
             CombatHUDOverlay(gameState: gameState)
 
-            // Series-end overlay (Section 4 step 8 — WINNER + FATALITY if applicable).
             if gameState.seriesEnded {
                 VictoryView(
                     winnerName: gameState.seriesWinnerIsPlayer ? gameState.playerName : gameState.enemyName,
                     isFatality: gameState.isFatality,
-                    onReplay: { dismiss() },        // Phase 2 stub: bounce to menu, Phase 3 will rematch in place
+                    onReplay: { dismiss() },
                     onChangeShip: { dismiss() },
                     onMainMenu: { dismiss() }
                 )
                 .transition(.opacity)
             }
 
-            // Touch controls — analog stick bottom-left, buttons bottom-right.
             VStack {
                 HStack {
                     Spacer()
@@ -49,9 +46,7 @@ struct CombatSceneView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .background(Color.black.opacity(0.5))
-                            .overlay(
-                                Rectangle().stroke(Color(.sRGB, red: 1.0, green: 0.2, blue: 0.4), lineWidth: 1)
-                            )
+                            .overlay(Rectangle().stroke(Color(.sRGB, red: 1.0, green: 0.2, blue: 0.4), lineWidth: 1))
                     }
                     .padding(.top, 8)
                     .padding(.trailing, 16)
@@ -69,6 +64,10 @@ struct CombatSceneView: View {
             }
         }
         .navigationBarBackButtonHiddenIfAvailable()
+        .focusable()
+        .focused($sceneFocused)
+        .onAppear { sceneFocused = true }
+        .onKeyPress(phases: [.down, .up]) { press in handleKey(press) }
     }
 
     private func makeScene() -> CombatScene {
@@ -78,6 +77,42 @@ struct CombatSceneView: View {
         scene.input = input
         scene.gameState = gameState
         return scene
+    }
+
+    // MARK: - Keyboard (Section 10)
+    //
+    // Modern SwiftUI .onKeyPress works on Mac Catalyst and on iPad with hardware keyboards.
+    // We map each key onto the same InputState fields the touch controls write to, so the
+    // gameplay code stays input-agnostic.
+    private func handleKey(_ press: KeyPress) -> KeyPress.Result {
+        let pressed = press.phase == .down || press.phase == .repeat
+        switch press.key {
+        case .space:           input.aPressed = pressed
+        case KeyEquivalent("f"): input.bPressed = pressed
+        case KeyEquivalent("g"): input.cPressed = pressed
+        case .upArrow:         input.xPressed = pressed
+        case KeyEquivalent("w"): input.xPressed = pressed
+        case .downArrow:       input.yPressed = pressed
+        case KeyEquivalent("s"): input.yPressed = pressed
+        case .leftArrow:       setStickX(pressed ? -1 : 0, ifMatching: -1)
+        case KeyEquivalent("a"): setStickX(pressed ? -1 : 0, ifMatching: -1)
+        case .rightArrow:      setStickX(pressed ? 1 : 0, ifMatching: 1)
+        case KeyEquivalent("d"): setStickX(pressed ? 1 : 0, ifMatching: 1)
+        case KeyEquivalent("p"): if pressed { /* Phase 2 stub — pause hookup pending */ }
+        case .escape:          if pressed { dismiss() }
+        default:               return .ignored
+        }
+        return .handled
+    }
+
+    /// Set stickX, but on release only clear if the current value matches our key direction.
+    /// This avoids "release of right arrow" wiping a still-held left arrow.
+    private func setStickX(_ newValue: CGFloat, ifMatching match: CGFloat) {
+        if newValue != 0 {
+            input.stickX = newValue
+        } else if input.stickX == match {
+            input.stickX = 0
+        }
     }
 }
 

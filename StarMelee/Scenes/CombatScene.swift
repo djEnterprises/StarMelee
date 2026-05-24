@@ -25,7 +25,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     private var enemySecondary: Weapon!
     private var aiController: AIController!
     private var activeProjectiles: [Projectile] = []
+    private var activePowerUps: [PowerUp] = []
     private var planets: [Planet] = []
+    private var powerUpManager: PowerUpManager!
 
     // MARK: - Match management
     private let matchManager = MatchManager()
@@ -56,6 +58,12 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         buildPlanetField()
         spawnShips()
         wireWeapons()
+
+        powerUpManager = PowerUpManager(definitions: PowerUpDefinition.loadAll())
+
+        // One-time minimap data
+        gameState?.worldRect = worldRect
+        gameState?.planetMarkers = planets.map { ($0.position, $0.radius) }
 
         cameraNode.position = playerShip.position
         publishGameState()
@@ -226,6 +234,28 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             return !alive
         }
 
+        // Power-up lifecycle (Section 8: spawn during active match only; despawn after 12s)
+        activePowerUps.removeAll { p in
+            let alive = p.tick(dt: dt)
+            if !alive { p.removeFromParent() }
+            return !alive
+        }
+        if matchManager.allowSpecials {
+            if let spawn = powerUpManager.update(
+                dt: dt,
+                playerHealthFraction: playerShip.healthFraction,
+                enemyHealthFraction: enemyShip.healthFraction,
+                playerPos: playerShip.position,
+                enemyPos: enemyShip.position,
+                viewport: size,
+                world: worldRect
+            ) {
+                spawn.powerUp.position = spawn.position
+                worldNode.addChild(spawn.powerUp)
+                activePowerUps.append(spawn.powerUp)
+            }
+        }
+
         // World boundary
         PhysicsEngine.enforceWorldBounds(ship: playerShip, world: worldRect)
         PhysicsEngine.enforceWorldBounds(ship: enemyShip, world: worldRect)
@@ -326,6 +356,12 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         )
         gs.enemyDistanceUnits = hypot(playerShip.position.x - enemyShip.position.x,
                                       playerShip.position.y - enemyShip.position.y)
+
+        // Minimap (Section 4)
+        gs.cameraViewport = cameraRect
+        gs.playerWorldPos = playerShip.position
+        gs.enemyWorldPos = enemyShip.position
+        gs.powerUpMarkers = activePowerUps.map { $0.position }
     }
 
     private func handlePhaseChange(_ change: MatchManager.PhaseChange) {
@@ -373,7 +409,20 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             removeProjectile(proj)
         } else if let proj = (bBody.node as? Projectile), aBody.categoryBitMask == PhysicsCategory.planet {
             removeProjectile(proj)
+        } else if let pu = (aBody.node as? PowerUp), let ship = (bBody.node as? Ship) {
+            handlePowerUp(pu, collectedBy: ship)
+        } else if let pu = (bBody.node as? PowerUp), let ship = (aBody.node as? Ship) {
+            handlePowerUp(pu, collectedBy: ship)
         }
+    }
+
+    private func handlePowerUp(_ pu: PowerUp, collectedBy ship: Ship) {
+        let extraTime = pu.collect(by: ship)
+        if extraTime > 0 {
+            matchManager.extendActiveTimer(by: extraTime)
+        }
+        pu.removeFromParent()
+        activePowerUps.removeAll { $0 === pu }
     }
 
     private func handleProjectile(_ proj: Projectile, hitting target: Ship) {

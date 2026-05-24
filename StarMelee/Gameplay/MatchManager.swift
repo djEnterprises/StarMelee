@@ -153,6 +153,14 @@ final class MatchManager {
         }
     }
 
+    /// Add seconds to the currently active match timer (used by the timer-extension power-up).
+    /// No-op in any other phase.
+    func extendActiveTimer(by seconds: TimeInterval) {
+        if case .active(let remaining) = phase {
+            phase = .active(remaining: remaining + seconds)
+        }
+    }
+
     private func endMatch(winner: Ship.Side, fatality: Bool) -> PhaseChange {
         phase = .interMatch(remaining: Self.interMatchSeconds)
         return .matchEnded(winner: winner, fatality: fatality)

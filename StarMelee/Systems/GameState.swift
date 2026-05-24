@@ -35,4 +35,16 @@ final class GameState: ObservableObject {
     @Published var seriesEnded: Bool = false
     @Published var seriesWinnerIsPlayer: Bool = true
     @Published var isFatality: Bool = false
+
+    // Tactical minimap data (Section 4 + 14)
+    /// World bounds in points — set once at scene start.
+    @Published var worldRect: CGRect = .zero
+    /// Current camera viewport in world coordinates — used for the minimap's viewport rectangle.
+    @Published var cameraViewport: CGRect = .zero
+    @Published var playerWorldPos: CGPoint = .zero
+    @Published var enemyWorldPos: CGPoint = .zero
+    /// Planet position + radius pairs, captured at world build time.
+    @Published var planetMarkers: [(CGPoint, CGFloat)] = []
+    /// Power-up positions — replaced each frame.
+    @Published var powerUpMarkers: [CGPoint] = []
 }
