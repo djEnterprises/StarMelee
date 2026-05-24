@@ -1,0 +1,16 @@
+[
+  { "id": "life_restore_small",   "name": "Life Restore +10%",   "kind": "lifeRestore",        "magnitude": 0.10, "duration_seconds": 0, "weight": 1.0 },
+  { "id": "life_restore_medium",  "name": "Life Restore +50%",   "kind": "lifeRestore",        "magnitude": 0.50, "duration_seconds": 0, "weight": 0.45 },
+  { "id": "life_restore_full",    "name": "Life Restore +100%",  "kind": "lifeRestore",        "magnitude": 1.00, "duration_seconds": 0, "weight": 0.10 },
+  { "id": "battery_restore_small","name": "Battery +10%",        "kind": "batteryRestore",     "magnitude": 0.10, "duration_seconds": 0, "weight": 1.0 },
+  { "id": "battery_restore_med",  "name": "Battery +50%",        "kind": "batteryRestore",     "magnitude": 0.50, "duration_seconds": 0, "weight": 0.45 },
+  { "id": "battery_restore_full", "name": "Battery +100%",       "kind": "batteryRestore",     "magnitude": 1.00, "duration_seconds": 0, "weight": 0.10 },
+  { "id": "shield_restore",       "name": "Shield Restore +50%", "kind": "shieldRestore",      "magnitude": 0.50, "duration_seconds": 0, "weight": 0.8 },
+  { "id": "quantum_torpedo_ammo", "name": "Quantum Torpedo +1",  "kind": "quantumTorpedoAmmo", "magnitude": 1.0,  "duration_seconds": 0, "weight": 0.25 },
+  { "id": "speed_boost_charge",   "name": "Speed Boost Reset",   "kind": "speedBoostCharge",   "magnitude": 1.0,  "duration_seconds": 0, "weight": 0.6 },
+  { "id": "special_reset",        "name": "Special Reset",       "kind": "specialReset",       "magnitude": 1.0,  "duration_seconds": 0, "weight": 0.5 },
+  { "id": "timer_extension",      "name": "Timer +30s",          "kind": "timerExtension",     "magnitude": 30.0, "duration_seconds": 0, "weight": 0.2 },
+  { "id": "damage_multiplier",    "name": "Damage x2 (8s)",      "kind": "damageMultiplier",   "magnitude": 2.0,  "duration_seconds": 8, "weight": 0.4 },
+  { "id": "shield_regen_boost",   "name": "Shield Regen x3",     "kind": "shieldRegenBoost",   "magnitude": 3.0,  "duration_seconds": 10, "weight": 0.4 },
+  { "id": "repair_drone",         "name": "Repair Drone (15s)",  "kind": "repairDrone",        "magnitude": 1.0,  "duration_seconds": 15, "weight": 0.35 }
+]
