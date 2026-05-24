@@ -1,15 +1,18 @@
 import SwiftUI
 import SpriteKit
 
-/// SwiftUI wrapper that presents `CombatScene` via `SpriteView`.
-/// Phase 1 just hosts the scene; Phase 2 will overlay the HUD and touch controls.
+/// SwiftUI host for `CombatScene`. Composes the SpriteKit view, the HUD overlay,
+/// and the touch controls (analog joystick + 6-button cluster).
 struct CombatSceneView: View {
     let playerShipID: String
 
+    @StateObject private var input = InputState()
+    @StateObject private var gameState = GameState()
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
+            // SpriteKit scene fills the entire viewport.
             SpriteView(
                 scene: makeScene(),
                 options: [.ignoresSiblingOrder],
@@ -17,7 +20,10 @@ struct CombatSceneView: View {
             )
             .ignoresSafeArea()
 
-            // Phase 1 exit affordance — placeholder until Phase 2 pause overlay lands.
+            // HUD — read-only overlay, never blocks input.
+            CombatHUDOverlay(gameState: gameState)
+
+            // Touch controls — analog stick bottom-left, buttons bottom-right.
             VStack {
                 HStack {
                     Spacer()
@@ -35,9 +41,19 @@ struct CombatSceneView: View {
                                 Rectangle().stroke(Color(.sRGB, red: 1.0, green: 0.2, blue: 0.4), lineWidth: 1)
                             )
                     }
-                    .padding(20)
+                    .padding(.top, 8)
+                    .padding(.trailing, 16)
                 }
                 Spacer()
+                HStack(alignment: .bottom) {
+                    AnalogStickView(input: input)
+                        .padding(.leading, 24)
+                        .padding(.bottom, 24)
+                    Spacer()
+                    ButtonClusterView(input: input)
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 24)
+                }
             }
         }
         .navigationBarBackButtonHiddenIfAvailable()
@@ -47,6 +63,8 @@ struct CombatSceneView: View {
         let scene = CombatScene(size: CGSize(width: 1024, height: 768))
         scene.playerShipID = playerShipID
         scene.scaleMode = .resizeFill
+        scene.input = input
+        scene.gameState = gameState
         return scene
     }
 }
