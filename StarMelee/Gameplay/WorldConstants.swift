@@ -20,10 +20,10 @@ enum WorldConstants {
     /// Section 4: "Ships bounce softly off the outer walls with ~45% velocity loss" → keep 0.55.
     static let wallBounceRetention: CGFloat = 0.55
 
-    /// Phase 1 enemy-ship spawn distance from player, expressed in viewport widths.
-    /// Section 4 specifies 3 viewport-widths for v1.0 — Phase 1 uses a tighter spawn so the placeholder
-    /// enemy is visible on screen for immediate testing. Bump to 3.0 in Phase 2.
-    static let phase1EnemySpawnViewports: CGFloat = 0.6
+    /// Enemy-ship spawn distance from player, expressed in viewport widths.
+    /// Section 4 specifies ~3 viewport-widths for v1.0. With an AI opponent in Phase 2 this is fine —
+    /// the AI closes distance aggressively and the off-screen indicator points the way.
+    static let enemySpawnViewports: CGFloat = 3.0
 
     // MARK: - Physics conversion
     //

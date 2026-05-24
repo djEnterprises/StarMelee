@@ -21,6 +21,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     private var enemyShip: Ship!
     private var playerPrimary: Weapon!
     private var playerSecondary: Weapon!
+    private var enemyPrimary: Weapon!
+    private var enemySecondary: Weapon!
+    private var aiController: AIController!
     private var activeProjectiles: [Projectile] = []
     private var planets: [Planet] = []
 
@@ -100,12 +103,12 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         let enemyDef = ships.first(where: { $0.id == enemyShipID }) ?? playerDef
 
         playerShip = Ship(definition: playerDef, side: .player)
-        playerShip.position = CGPoint(x: -size.width * WorldConstants.phase1EnemySpawnViewports / 2, y: 0)
+        playerShip.position = CGPoint(x: -size.width * WorldConstants.enemySpawnViewports / 2, y: 0)
         playerShip.heading = 0
         worldNode.addChild(playerShip)
 
         enemyShip = Ship(definition: enemyDef, side: .opponent)
-        enemyShip.position = CGPoint(x:  size.width * WorldConstants.phase1EnemySpawnViewports / 2, y: 0)
+        enemyShip.position = CGPoint(x:  size.width * WorldConstants.enemySpawnViewports / 2, y: 0)
         enemyShip.heading = .pi
         worldNode.addChild(enemyShip)
 
@@ -115,17 +118,35 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
 
     private func wireWeapons() {
         let weapons = WeaponDefinition.loadAll()
-        let primaryID = playerShip.definition.weapons.primary
-        let secondaryID = playerShip.definition.weapons.secondary
-        guard let primaryDef = weapons.first(where: { $0.id == primaryID }),
-              let secondaryDef = weapons.first(where: { $0.id == secondaryID }) else {
-            assertionFailure("Weapons.json missing entries for \(primaryID) / \(secondaryID)")
-            return
+
+        // Player
+        playerPrimary = makeWeapon(weaponID: playerShip.definition.weapons.primary,
+                                   fireRateFrames: playerShip.definition.stats.primaryFireRateFrames,
+                                   in: weapons)!
+        playerSecondary = makeWeapon(weaponID: playerShip.definition.weapons.secondary,
+                                     fireRateFrames: playerShip.definition.stats.secondaryFireRateFrames,
+                                     in: weapons)!
+
+        // Enemy
+        enemyPrimary = makeWeapon(weaponID: enemyShip.definition.weapons.primary,
+                                  fireRateFrames: enemyShip.definition.stats.primaryFireRateFrames,
+                                  in: weapons)!
+        enemySecondary = makeWeapon(weaponID: enemyShip.definition.weapons.secondary,
+                                    fireRateFrames: enemyShip.definition.stats.secondaryFireRateFrames,
+                                    in: weapons)!
+
+        // AI difficulty from settings, defaulting to Captain (Section 15 default).
+        let savedDifficulty = UserDefaults.standard.string(forKey: "settings.aiDifficulty") ?? "captain"
+        let diff = AIController.Difficulty(rawValue: savedDifficulty) ?? .captain
+        aiController = AIController(difficulty: diff)
+    }
+
+    private func makeWeapon(weaponID: String, fireRateFrames: Int, in weapons: [WeaponDefinition]) -> Weapon? {
+        guard let def = weapons.first(where: { $0.id == weaponID }) else {
+            assertionFailure("Weapons.json missing entry: \(weaponID)")
+            return nil
         }
-        playerPrimary = Weapon(definition: primaryDef,
-                               fireRateFrames: playerShip.definition.stats.primaryFireRateFrames)
-        playerSecondary = Weapon(definition: secondaryDef,
-                                 fireRateFrames: playerShip.definition.stats.secondaryFireRateFrames)
+        return Weapon(definition: def, fireRateFrames: fireRateFrames)
     }
 
     // MARK: - Update loop
@@ -147,13 +168,30 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         // primary + secondary firing (Section 23 #2) and movement; specials are locked.
         let canControlPlayer = !matchManager.isSeriesOver
 
-        // Ship integration
+        // Player integration
         playerShip.update(dt: dt,
                           thrust: canControlPlayer && thrust,
                           brake: canControlPlayer && brake,
                           turn: canControlPlayer ? turn : 0,
                           allowSpecials: allowSpecials)
-        enemyShip.update(dt: dt, thrust: false, brake: false, turn: 0, allowSpecials: allowSpecials)
+
+        // AI integration — Section 23 #2 also gives the AI primary/secondary during practice
+        // but at reduced cadence. We model the cadence reduction by gating fire decisions to a
+        // 60% / 20% rate during pre-match.
+        let aiDecision = aiController.decide(dt: dt,
+                                             ownShip: enemyShip,
+                                             target: playerShip,
+                                             allowSpecials: allowSpecials)
+        let aiCadenceCutPrimary: CGFloat = matchManager.allowSpecials ? 1.0 : 0.6
+        let aiCadenceCutSecondary: CGFloat = matchManager.allowSpecials ? 1.0 : 0.2
+        let aiFirePrimary = aiDecision.firePrimary && CGFloat.random(in: 0...1) < aiCadenceCutPrimary
+        let aiFireSecondary = aiDecision.fireSecondary && CGFloat.random(in: 0...1) < aiCadenceCutSecondary
+
+        enemyShip.update(dt: dt,
+                         thrust: aiDecision.thrust,
+                         brake: aiDecision.brake,
+                         turn: aiDecision.turn,
+                         allowSpecials: allowSpecials)
 
         // Gravity (ramps during last 5s of countdown, full during active match)
         applyPlanetGravity(to: playerShip, dt: dt)
@@ -162,11 +200,21 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         // Weapons (primary + secondary always allowed during pre-match per Section 23 #2)
         playerPrimary.tick(dt: dt)
         playerSecondary.tick(dt: dt)
+        enemyPrimary.tick(dt: dt)
+        enemySecondary.tick(dt: dt)
         if canControlPlayer && firing1, let shot = playerPrimary.fire(from: playerShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
         }
         if canControlPlayer && firing2, let shot = playerSecondary.fire(from: playerShip, target: enemyShip) {
+            worldNode.addChild(shot)
+            activeProjectiles.append(shot)
+        }
+        if aiFirePrimary, let shot = enemyPrimary.fire(from: enemyShip) {
+            worldNode.addChild(shot)
+            activeProjectiles.append(shot)
+        }
+        if aiFireSecondary, let shot = enemySecondary.fire(from: enemyShip, target: playerShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
         }
@@ -302,7 +350,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         playerShip.fullyRestore()
         enemyShip.fullyRestore()
         // Re-position to the configured spawn
-        let halfSpread = size.width * WorldConstants.phase1EnemySpawnViewports / 2
+        let halfSpread = size.width * WorldConstants.enemySpawnViewports / 2
         playerShip.position = CGPoint(x: -halfSpread, y: 0)
         enemyShip.position = CGPoint(x:  halfSpread, y: 0)
         playerShip.heading = 0
