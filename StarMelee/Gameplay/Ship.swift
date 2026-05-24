@@ -69,19 +69,13 @@ final class Ship: SKNode {
         self.shield = self.maxShield
         self.battery = self.maxBattery
 
-        // Build hull — simple arrow pointing up (+y). Faction-tinted.
+        // Build hull — faction-tinted polygon silhouette from the ShipHullDesigner.
         let color: SKColor = side == .player
             ? SKColor(red: 0, green: 1.0, blue: 0.84, alpha: 1.0)
             : SKColor(red: 1.0, green: 0.2, blue: 0.4, alpha: 1.0)
 
-        let hullPath = CGMutablePath()
         let s2 = hitboxRadius * 1.5
-        hullPath.move(to: CGPoint(x: 0, y: s2))           // nose
-        hullPath.addLine(to: CGPoint(x: s2 * 0.7, y: -s2 * 0.6))   // right wing tip
-        hullPath.addLine(to: CGPoint(x: 0, y: -s2 * 0.3))         // tail notch
-        hullPath.addLine(to: CGPoint(x: -s2 * 0.7, y: -s2 * 0.6))  // left wing tip
-        hullPath.closeSubpath()
-
+        let hullPath = ShipHullDesigner.cgPath(for: definition.id, size: s2)
         self.hull = SKShapeNode(path: hullPath)
         hull.fillColor = color.withAlphaComponent(0.18)
         hull.strokeColor = color
