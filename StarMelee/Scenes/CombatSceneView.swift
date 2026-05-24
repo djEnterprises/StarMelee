@@ -23,6 +23,18 @@ struct CombatSceneView: View {
             // HUD — read-only overlay, never blocks input.
             CombatHUDOverlay(gameState: gameState)
 
+            // Series-end overlay (Section 4 step 8 — WINNER + FATALITY if applicable).
+            if gameState.seriesEnded {
+                VictoryView(
+                    winnerName: gameState.seriesWinnerIsPlayer ? gameState.playerName : gameState.enemyName,
+                    isFatality: gameState.isFatality,
+                    onReplay: { dismiss() },        // Phase 2 stub: bounce to menu, Phase 3 will rematch in place
+                    onChangeShip: { dismiss() },
+                    onMainMenu: { dismiss() }
+                )
+                .transition(.opacity)
+            }
+
             // Touch controls — analog stick bottom-left, buttons bottom-right.
             VStack {
                 HStack {

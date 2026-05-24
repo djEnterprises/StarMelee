@@ -228,6 +228,14 @@ final class Ship: SKNode {
         return healthLoss
     }
 
+    /// Restore health, shield, and battery to 100% — used between matches (Section 4 step 6).
+    func fullyRestore() {
+        health = maxHealth
+        shield = maxShield
+        battery = maxBattery
+        secondsSinceDamage = .infinity
+    }
+
     var isDestroyed: Bool { health <= 0 }
 
     var healthFraction: CGFloat { maxHealth > 0 ? health / maxHealth : 0 }

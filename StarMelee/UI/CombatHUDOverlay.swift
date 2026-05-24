@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Phase 1 HUD overlay — minimal: player + enemy health bars, off-screen enemy indicator,
-/// and a small "PRACTICE / MATCH" label placeholder.
+/// HUD overlay — life/shield/battery bars, match timer, score, off-screen indicator,
+/// pre-match countdown digit + PRACTICE banner.
 ///
-/// **Plan reference:** Section 14 (HUD design — Mortal Kombat 1 style life bars).
-/// Phase 2 will add full life/shield/battery stacks, match timer, score, minimap, power-up chips.
+/// **Plan reference:** Section 14 (HUD design), Section 4 (match flow), Section 23 #4/#5
+/// (PRACTICE banner + semi-transparent countdown).
 struct CombatHUDOverlay: View {
     @ObservedObject var gameState: GameState
 
@@ -13,12 +13,12 @@ struct CombatHUDOverlay: View {
 
     var body: some View {
         ZStack {
-            // Top stat bars + match label
+            // Top stat bars + center match info
             VStack {
                 HStack(alignment: .top, spacing: 16) {
                     playerPanel
                     Spacer()
-                    matchCenterLabel
+                    matchCenterPanel
                     Spacer()
                     enemyPanel
                 }
@@ -39,8 +39,13 @@ struct CombatHUDOverlay: View {
                 }
             }
             .allowsHitTesting(false)
+
+            // Pre-match countdown digit (Section 23 #5: ~35% opacity so arena stays visible)
+            if gameState.inPreMatch {
+                CountdownOverlay(secondsRemaining: gameState.preMatchSecondsRemaining)
+            }
         }
-        .allowsHitTesting(false)   // overlay never blocks input; the stick/buttons sit above
+        .allowsHitTesting(false)
     }
 
     private var playerPanel: some View {
@@ -68,6 +73,8 @@ struct CombatHUDOverlay: View {
                 .tracking(2)
                 .foregroundStyle(dominionRed)
             statBar(fraction: gameState.enemyHealth, color: healthColor(gameState.enemyHealth), reversed: true)
+            statBar(fraction: gameState.enemyShield, color: dominionRed.opacity(0.7), reversed: true)
+                .frame(height: 4)
         }
         .frame(width: 180, alignment: .trailing)
         .padding(8)
@@ -75,16 +82,34 @@ struct CombatHUDOverlay: View {
         .overlay(Rectangle().stroke(dominionRed, lineWidth: 1))
     }
 
-    private var matchCenterLabel: some View {
+    private var matchCenterPanel: some View {
         VStack(spacing: 2) {
             Text("STAR MELEE")
                 .font(.system(size: 11, weight: .heavy, design: .rounded))
                 .tracking(4)
                 .foregroundStyle(.white.opacity(0.7))
-            Text(gameState.matchPhaseLabel)
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
+            Text(formattedTimer)
+                .font(.system(size: 22, weight: .bold, design: .monospaced))
+                .foregroundStyle(timerColor)
+                .monospacedDigit()
+            Text("\(gameState.matchPhaseLabel) — WINS \(gameState.playerWins)–\(gameState.opponentWins)")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.yellow)
         }
+    }
+
+    private var formattedTimer: String {
+        let s = gameState.inActiveMatch ? gameState.matchSecondsRemaining : MatchManager.activeMatchSeconds
+        let secs = max(0, Int(ceil(s)))
+        return String(format: "%d:%02d", secs / 60, secs % 60)
+    }
+
+    private var timerColor: Color {
+        guard gameState.inActiveMatch else { return .white.opacity(0.5) }
+        let s = gameState.matchSecondsRemaining
+        if s <= 10 { return .red }
+        if s <= 30 { return .yellow }
+        return .white
     }
 
     private func statBar(fraction: CGFloat, color: Color, reversed: Bool = false) -> some View {
@@ -107,6 +132,44 @@ struct CombatHUDOverlay: View {
     }
 }
 
+// MARK: - Pre-match countdown overlay
+
+private struct CountdownOverlay: View {
+    let secondsRemaining: TimeInterval
+
+    var body: some View {
+        let digit = max(1, Int(ceil(secondsRemaining)))
+        ZStack {
+            // "PRACTICE" banner with hint text (Section 23 #4)
+            VStack {
+                Spacer().frame(height: 90)
+                VStack(spacing: 6) {
+                    Text("PRACTICE")
+                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .tracking(6)
+                        .foregroundStyle(Color(.sRGB, red: 1.0, green: 0.67, blue: 0))
+                    Text("Move + fire A (primary) / B (secondary) to test your ship.\nSpecials, Boost, Transporter, Cloak unlock at MATCH START.")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                Spacer()
+            }
+
+            // Semi-transparent digit — 35% opacity per Section 23 #5
+            Text("\(digit)")
+                .font(.system(size: 280, weight: .black, design: .rounded))
+                .foregroundStyle(.white.opacity(0.35))
+                .shadow(color: Color(.sRGB, red: 0, green: 1.0, blue: 0.84, opacity: 0.4), radius: 30)
+                .transition(.scale.combined(with: .opacity))
+                .id(digit)   // re-trigger animation when digit changes
+                .animation(.easeOut(duration: 0.4), value: digit)
+        }
+    }
+}
+
+// MARK: - Off-screen enemy indicator
+
 private struct OffscreenIndicator: View {
     let direction: CGVector
     let distance: CGFloat
@@ -114,15 +177,12 @@ private struct OffscreenIndicator: View {
     let color: Color
 
     var body: some View {
-        // Clamp the direction to the viewport edge, leaving safe padding for HUD + controls.
         let safePadding: CGFloat = 70
         let halfW = max(1, viewportSize.width / 2 - safePadding)
         let halfH = max(1, viewportSize.height / 2 - safePadding)
         let dx = direction.dx
         let dy = direction.dy
         let mag = max(0.001, hypot(dx, dy))
-
-        // Scale so the arrow sits on the edge of the safe rect.
         let scaleX = halfW / max(0.001, abs(dx))
         let scaleY = halfH / max(0.001, abs(dy))
         let scale = min(scaleX, scaleY)
@@ -143,7 +203,6 @@ private struct OffscreenIndicator: View {
         }
         .position(x: viewportSize.width / 2 + offsetX,
                   y: viewportSize.height / 2 + offsetY)
-        // Magnitude unused now but referenced so the compiler stays quiet on future tweaks.
         .onAppear { _ = mag }
     }
 }

@@ -3,21 +3,16 @@ import GameplayKit
 
 /// The active 2D arena where ship-to-ship combat happens.
 ///
-/// **Plan reference:** Sections 4 (world model + camera), 5 (ship), 6 (weapons), 7 (HP/shield/battery),
-/// 14 (visuals), 23 (mockup fixes — especially the `allowSpecials: Bool` flag pattern).
-///
-/// Phase 1 mid-build scope:
-///   ✓ One playable ship (Aegis Cruiser), full inertia, no auto-drag
-///   ✓ Stationary placeholder enemy (Phase 2 replaces with AIController)
-///   ✓ Primary + secondary weapons firing, damage, projectile bounds
-///   ✓ Lerp-following camera, bounded world (Section 4)
-///   ✓ Per-frame writes to GameState so the SwiftUI HUD can show health + off-screen indicator
+/// **Plan reference:** Sections 4 (world model + camera + planet field), 5 (ship), 6 (weapons),
+/// 7 (HP/shield/battery), 14 (visuals), 23 (mockup fixes — `allowSpecials: Bool` flag pattern,
+/// gravity ramp, semi-transparent countdown digit).
 final class CombatScene: SKScene, SKPhysicsContactDelegate {
 
-    // MARK: - Injected dependencies (set by `CombatSceneView` before presentation)
+    // MARK: - Injected dependencies
     weak var input: InputState?
     weak var gameState: GameState?
     var playerShipID: String = "aegis_cruiser"
+    var enemyShipID: String = "void_reaper"
 
     // MARK: - Scene nodes
     private let worldNode = SKNode()
@@ -27,7 +22,10 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     private var playerPrimary: Weapon!
     private var playerSecondary: Weapon!
     private var activeProjectiles: [Projectile] = []
-    private var starLayers: [SKNode] = []
+    private var planets: [Planet] = []
+
+    // MARK: - Match management
+    private let matchManager = MatchManager()
 
     // MARK: - World geometry
     private var worldRect: CGRect = .zero
@@ -43,7 +41,6 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         physicsWorld.gravity = .zero
         physicsWorld.contactDelegate = self
 
-        // World rect — Section 4: WORLD_SCALE × viewport.
         let w = size.width * WorldConstants.worldScaleFactor
         let h = size.height * WorldConstants.worldScaleFactor
         worldRect = CGRect(x: -w / 2, y: -h / 2, width: w, height: h)
@@ -53,24 +50,19 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         self.camera = cameraNode
 
         buildStarfield()
-        buildPlaceholderPlanet()
+        buildPlanetField()
         spawnShips()
         wireWeapons()
 
-        // Initial camera & HUD push.
         cameraNode.position = playerShip.position
         publishGameState()
     }
 
     private func buildStarfield() {
-        // Three parallax layers — each layer is a static SKNode containing many small SKShapeNode stars,
-        // tiled across the full world. Slowest layer is largest, farthest, and most opaque-shifted dim.
-        // Real parallax in a single-camera setup is faked via depth scale: distant stars are drawn
-        // very small and don't pop visually as the camera moves long distances.
         let specs: [(count: Int, alphaRange: ClosedRange<CGFloat>, sizeRange: ClosedRange<CGFloat>)] = [
-            (600, 0.20...0.50, 0.4...1.0),  // far
-            (300, 0.40...0.75, 0.7...1.6),  // mid
-            (120, 0.60...0.95, 1.2...2.4),  // near
+            (600, 0.20...0.50, 0.4...1.0),
+            (300, 0.40...0.75, 0.7...1.6),
+            (120, 0.60...0.95, 1.2...2.4),
         ]
         for spec in specs {
             let layer = SKNode()
@@ -88,62 +80,36 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
                 layer.addChild(star)
             }
             worldNode.addChild(layer)
-            starLayers.append(layer)
         }
     }
 
-    private func buildPlaceholderPlanet() {
-        // Single planet at world center for early visual reference.
-        // Phase 2 will spawn 10–14 planets per Section 4 with 280-unit minimum spacing.
-        let planet = SKShapeNode(circleOfRadius: 56)
-        planet.position = .zero
-        planet.fillColor = SKColor(red: 0.6, green: 0.3, blue: 0.8, alpha: 1.0)
-        planet.strokeColor = SKColor(red: 1.0, green: 0.4, blue: 0.9, alpha: 0.8)
-        planet.lineWidth = 2
-        planet.glowWidth = 12
-        planet.name = "placeholder_planet"
-
-        let body = SKPhysicsBody(circleOfRadius: 56)
-        body.affectedByGravity = false
-        body.isDynamic = false
-        body.categoryBitMask = PhysicsCategory.planet
-        body.collisionBitMask = PhysicsCategory.playerShip | PhysicsCategory.enemyShip
-        body.contactTestBitMask = PhysicsCategory.playerShot | PhysicsCategory.enemyShot
-        planet.physicsBody = body
-        worldNode.addChild(planet)
-
-        // Gravity-well visual ring (cosmetic only in Phase 1; Phase 2 wires actual gravity).
-        let ring = SKShapeNode(circleOfRadius: 200)
-        ring.fillColor = .clear
-        ring.strokeColor = SKColor(red: 1.0, green: 0.4, blue: 0.9, alpha: 0.18)
-        ring.lineWidth = 1
-        ring.zPosition = -1
-        worldNode.addChild(ring)
+    private func buildPlanetField() {
+        // Section 4: 10–14 planets, ≥280 units apart, avoiding the spawn corridor.
+        planets = Planet.generateField(world: worldRect, spawnCorridorHalfHeight: size.height * 0.75)
+        for planet in planets {
+            worldNode.addChild(planet)
+        }
     }
 
     private func spawnShips() {
         let ships = ShipDefinition.loadAll()
-        guard let aegis = ships.first(where: { $0.id == playerShipID }) ?? ships.first else {
+        guard let playerDef = ships.first(where: { $0.id == playerShipID }) ?? ships.first else {
             assertionFailure("Ships.json missing or empty — cannot scaffold combat.")
             return
         }
+        let enemyDef = ships.first(where: { $0.id == enemyShipID }) ?? playerDef
 
-        playerShip = Ship(definition: aegis, side: .player)
-        playerShip.position = CGPoint(x: -aegis.stats.hitboxSize * 4, y: 0)
-        playerShip.heading = 0   // facing +x (right)
+        playerShip = Ship(definition: playerDef, side: .player)
+        playerShip.position = CGPoint(x: -size.width * WorldConstants.phase1EnemySpawnViewports / 2, y: 0)
+        playerShip.heading = 0
         worldNode.addChild(playerShip)
 
-        // Phase 1 placeholder enemy — uses the same Aegis stats since we're only validating combat.
-        // Phase 2 will pick a Dominion ship at random and attach an AIController.
-        // Spawn ~0.6 viewport-widths to the right of the player so it's visible on screen
-        // for immediate Phase 1 testability. Section 4 spec is 3 viewport-widths; bump in Phase 2.
-        let enemyDef = ships.first(where: { $0.id == "void_reaper" }) ?? aegis
         enemyShip = Ship(definition: enemyDef, side: .opponent)
-        enemyShip.position = CGPoint(x: size.width * WorldConstants.phase1EnemySpawnViewports, y: 0)
-        enemyShip.heading = .pi   // facing -x (left, toward player)
+        enemyShip.position = CGPoint(x:  size.width * WorldConstants.phase1EnemySpawnViewports / 2, y: 0)
+        enemyShip.heading = .pi
         worldNode.addChild(enemyShip)
 
-        gameState?.playerName = aegis.name.uppercased()
+        gameState?.playerName = playerDef.name.uppercased()
         gameState?.enemyName = enemyDef.name.uppercased()
     }
 
@@ -168,30 +134,39 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         let dt = lastUpdate == 0 ? 1.0 / 60.0 : min(0.05, currentTime - lastUpdate)
         lastUpdate = currentTime
 
-        // Read input — defaults handle the case where the SwiftUI binding hasn't connected yet.
+        let allowSpecials = matchManager.allowSpecials
+
+        // Read input
         let thrust = input?.xPressed ?? false
         let brake  = input?.yPressed ?? false
         let turn   = input?.turnDirection ?? 0
         let firing1 = input?.aPressed ?? false
         let firing2 = input?.bPressed ?? false
 
-        // Section 23: `allowSpecials` is false during pre-match countdown. Phase 1 has no countdown
-        // yet, so always true. Phase 2 wires this to the MatchState phase.
-        let allowSpecials = true
+        // Phase 1: ships only move/fire when not in series-end. During pre-match we DO allow
+        // primary + secondary firing (Section 23 #2) and movement; specials are locked.
+        let canControlPlayer = !matchManager.isSeriesOver
 
-        // Ships
-        playerShip.update(dt: dt, thrust: thrust, brake: brake, turn: turn, allowSpecials: allowSpecials)
+        // Ship integration
+        playerShip.update(dt: dt,
+                          thrust: canControlPlayer && thrust,
+                          brake: canControlPlayer && brake,
+                          turn: canControlPlayer ? turn : 0,
+                          allowSpecials: allowSpecials)
         enemyShip.update(dt: dt, thrust: false, brake: false, turn: 0, allowSpecials: allowSpecials)
 
-        // Weapons
+        // Gravity (ramps during last 5s of countdown, full during active match)
+        applyPlanetGravity(to: playerShip, dt: dt)
+        applyPlanetGravity(to: enemyShip, dt: dt)
+
+        // Weapons (primary + secondary always allowed during pre-match per Section 23 #2)
         playerPrimary.tick(dt: dt)
         playerSecondary.tick(dt: dt)
-
-        if firing1, let shot = playerPrimary.fire(from: playerShip) {
+        if canControlPlayer && firing1, let shot = playerPrimary.fire(from: playerShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
         }
-        if firing2, let shot = playerSecondary.fire(from: playerShip, target: enemyShip) {
+        if canControlPlayer && firing2, let shot = playerSecondary.fire(from: playerShip, target: enemyShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
         }
@@ -203,17 +178,50 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             return !alive
         }
 
-        // World boundary handling for ships
+        // World boundary
         PhysicsEngine.enforceWorldBounds(ship: playerShip, world: worldRect)
         PhysicsEngine.enforceWorldBounds(ship: enemyShip, world: worldRect)
 
-        // Camera — lerp toward player, clamp to world.
+        // Camera
         let lerp = WorldConstants.cameraLerp * min(1, CGFloat(dt) * 60)
         cameraNode.position.x += (playerShip.position.x - cameraNode.position.x) * lerp
         cameraNode.position.y += (playerShip.position.y - cameraNode.position.y) * lerp
         clampCameraToWorld()
 
+        // Match state advance
+        if let change = matchManager.update(
+            dt: dt,
+            playerDestroyed: playerShip.isDestroyed,
+            enemyDestroyed: enemyShip.isDestroyed,
+            playerHealthFraction: playerShip.healthFraction,
+            enemyHealthFraction: enemyShip.healthFraction,
+            playerShieldFraction: playerShip.shieldFraction,
+            enemyShieldFraction: enemyShip.shieldFraction
+        ) {
+            handlePhaseChange(change)
+        }
+
         publishGameState()
+    }
+
+    private func applyPlanetGravity(to ship: Ship, dt: TimeInterval) {
+        let ramp = matchManager.gravityRampFactor
+        guard ramp > 0 else { return }
+        let G: CGFloat = 18000   // tuned for ~Star Control style influence at ~150 unit range
+        let dtf = CGFloat(dt)
+        for planet in planets {
+            let dx = planet.position.x - ship.position.x
+            let dy = planet.position.y - ship.position.y
+            let distSq = dx*dx + dy*dy
+            // Skip if very far away (perf + avoid summing tiny contributions across all planets).
+            if distSq > 800 * 800 { continue }
+            let minDistSq: CGFloat = (planet.radius * 1.5) * (planet.radius * 1.5)
+            let safeSq = max(minDistSq, distSq)
+            let dist = sqrt(safeSq)
+            let force = G * planet.gravMass * ramp / safeSq
+            ship.velocity.dx += (dx / dist) * force * dtf
+            ship.velocity.dy += (dy / dist) * force * dtf
+        }
     }
 
     private func clampCameraToWorld() {
@@ -229,16 +237,41 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         gs.playerShield = playerShip.shieldFraction
         gs.playerBattery = playerShip.batteryFraction
         gs.enemyHealth = enemyShip.healthFraction
+        gs.enemyShield = enemyShip.shieldFraction
 
-        // Off-screen indicator math (Section 4).
+        // Match phase mirror
+        switch matchManager.phase {
+        case .preMatch(let remaining):
+            gs.inPreMatch = true
+            gs.inActiveMatch = false
+            gs.preMatchSecondsRemaining = remaining
+            gs.matchSecondsRemaining = MatchManager.activeMatchSeconds
+        case .active(let remaining):
+            gs.inPreMatch = false
+            gs.inActiveMatch = true
+            gs.matchSecondsRemaining = remaining
+        case .interMatch:
+            gs.inPreMatch = false
+            gs.inActiveMatch = false
+        case .seriesEnded(let winner, let fatality):
+            gs.inPreMatch = false
+            gs.inActiveMatch = false
+            gs.seriesEnded = true
+            gs.seriesWinnerIsPlayer = (winner == .player)
+            gs.isFatality = fatality
+        }
+        gs.matchPhaseLabel = matchManager.phaseLabel
+        gs.matchNumber = matchManager.matchNumber
+        gs.playerWins = matchManager.playerWins
+        gs.opponentWins = matchManager.opponentWins
+
+        // Off-screen indicator
         let cameraPos = cameraNode.position
         let halfW = size.width / 2
         let halfH = size.height / 2
         let cameraRect = CGRect(x: cameraPos.x - halfW, y: cameraPos.y - halfH,
                                 width: size.width, height: size.height)
-        let onScreen = cameraRect.contains(enemyShip.position)
-        gs.enemyOnScreen = onScreen
-        // SwiftUI uses +y down; SpriteKit +y up. Flip y for the screen-direction vector.
+        gs.enemyOnScreen = cameraRect.contains(enemyShip.position)
         gs.enemyScreenDirection = CGVector(
             dx: enemyShip.position.x - cameraPos.x,
             dy: -(enemyShip.position.y - cameraPos.y)
@@ -247,20 +280,48 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
                                       playerShip.position.y - enemyShip.position.y)
     }
 
+    private func handlePhaseChange(_ change: MatchManager.PhaseChange) {
+        switch change {
+        case .countdownEnded:
+            // No-op visually for now; haptics + sound will land in Phase 3/4.
+            break
+        case .matchEnded:
+            // Active projectiles cleared so next match starts clean.
+            for p in activeProjectiles { p.removeFromParent() }
+            activeProjectiles.removeAll()
+        case .nextMatchStarted:
+            // Section 4 step 6: ships reset to 100% and respawn.
+            resetShipsForNextMatch()
+        case .seriesEnded:
+            // CombatSceneView observes GameState.seriesEnded and presents the overlay.
+            break
+        }
+    }
+
+    private func resetShipsForNextMatch() {
+        playerShip.fullyRestore()
+        enemyShip.fullyRestore()
+        // Re-position to the configured spawn
+        let halfSpread = size.width * WorldConstants.phase1EnemySpawnViewports / 2
+        playerShip.position = CGPoint(x: -halfSpread, y: 0)
+        enemyShip.position = CGPoint(x:  halfSpread, y: 0)
+        playerShip.heading = 0
+        enemyShip.heading = .pi
+        playerShip.velocity = .zero
+        enemyShip.velocity = .zero
+    }
+
     // MARK: - Collisions
 
     func didBegin(_ contact: SKPhysicsContact) {
         let aBody = contact.bodyA
         let bBody = contact.bodyB
 
-        // Identify projectile vs ship pairings (either order).
         if let proj = (aBody.node as? Projectile), let target = (bBody.node as? Ship) {
             handleProjectile(proj, hitting: target)
         } else if let proj = (bBody.node as? Projectile), let target = (aBody.node as? Ship) {
             handleProjectile(proj, hitting: target)
-        }
-        // Projectile vs planet — just remove projectile.
-        else if let proj = (aBody.node as? Projectile), bBody.categoryBitMask == PhysicsCategory.planet {
+        } else if let proj = (aBody.node as? Projectile), bBody.categoryBitMask == PhysicsCategory.planet {
             removeProjectile(proj)
         } else if let proj = (bBody.node as? Projectile), aBody.categoryBitMask == PhysicsCategory.planet {
             removeProjectile(proj)
@@ -268,7 +329,6 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func handleProjectile(_ proj: Projectile, hitting target: Ship) {
-        // Don't friendly-fire.
         if proj.firedBy == target.side { return }
         let damage = proj.computeDamage(against: target)
         target.takeDamage(damage)
