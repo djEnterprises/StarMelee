@@ -32,6 +32,15 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Match management
     private let matchManager = MatchManager()
 
+    // MARK: - Pause
+    /// When true, the update loop skips ship integration, AI, weapons, gravity, and match-state.
+    /// Named `customPaused` because `SKScene.isPaused` already exists and it pauses *actions*
+    /// rather than our own update logic — we want both, so we own the flag explicitly.
+    var customPaused: Bool = false {
+        didSet { self.isPaused = customPaused }   // also pause SK's action engine for cleanliness
+    }
+    private var lastZHandled: Bool = false   // edge-trigger Z button for speed boost
+
     // MARK: - World geometry
     private var worldRect: CGRect = .zero
 
@@ -163,6 +172,12 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         let dt = lastUpdate == 0 ? 1.0 / 60.0 : min(0.05, currentTime - lastUpdate)
         lastUpdate = currentTime
 
+        if customPaused {
+            // Freeze gameplay; still tick the HUD so the pause overlay reads current values.
+            publishGameState()
+            return
+        }
+
         let allowSpecials = matchManager.allowSpecials
 
         // Read input
@@ -171,6 +186,14 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         let turn   = input?.turnDirection ?? 0
         let firing1 = input?.aPressed ?? false
         let firing2 = input?.bPressed ?? false
+        let zPressed = input?.zPressed ?? false
+
+        // Edge-trigger speed boost: only engage on the rising edge of Z so a held button
+        // doesn't spam boost attempts every frame.
+        if zPressed && !lastZHandled {
+            playerShip.tryEngageSpeedBoost(allowSpecials: allowSpecials)
+        }
+        lastZHandled = zPressed
 
         // Phase 1: ships only move/fire when not in series-end. During pre-match we DO allow
         // primary + secondary firing (Section 23 #2) and movement; specials are locked.

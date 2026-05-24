@@ -63,11 +63,39 @@ placeholder SpriteKit arena with a parallax starfield. No ships yet — those la
 
 The plan splits work into five phases:
 
-1. **Core Combat Prototype** — project skeleton, menu shell, empty arena. *(current)*
-2. **Combat Depth** — all 12 ships, weapons, HUD, AI, 2-of-3 match series.
-3. **Special Mechanics** — Transporter Beam, Quantum Torpedo, Singularity, Cloak, Self-Destruct.
+1. **Core Combat Prototype** — project skeleton, menu shell, empty arena. ✅ *done*
+2. **Combat Depth** — all 12 ships, weapons, HUD, AI, 2-of-3 match series. ✅ *done (Phase 3 polish items below)*
+3. **Special Mechanics** — Transporter Beam, Quantum Torpedo, Singularity, Cloak, Self-Destruct. *(current)*
 4. **Audio + Compendium + Polish** — music, SFX, 3D ship rotator, settings, leaderboard.
 5. **IAP + macOS + Submission** — StoreKit 2, Mac Catalyst build, TestFlight, App Store.
+
+### What's playable right now
+
+- Main menu → Ship Select grid showing all 12 ship silhouettes filtered by faction
+- Pick a ship, hit **LAUNCH**, drop into the 16×16-viewport arena
+- 10-second pre-match practice phase with semi-transparent countdown and PRACTICE banner; primary + secondary firing allowed, specials locked
+- Full 2-of-3 series: each match runs a 2-minute timer (or ends on destruction), 3-second gap between matches, ships reset to 100%
+- Captain-difficulty AI opponent that pursues, aims with random error, fires primary + secondary, evades at low health
+- 10–14 planets per arena with gravity wells (gravity ramps up over last 5s of countdown)
+- 4 instant power-up types (life / battery / shield / timer-extension); 6 more types reserved for Phase 3
+- Tactical Minimap (top-right) shows the whole world, planets, power-ups, both ships, and the camera viewport
+- Off-screen enemy indicator with world-space distance
+- PS5-style analog joystick + 6-button cluster (A/B/C/X/Y/Z) on iOS
+- W A S D + Space/F/G + Esc/P keyboard map on Mac Catalyst (Section 10)
+- Pause overlay (HUD button or Esc/P) — freezes ship, weapons, AI, gravity, match timer
+- Speed Boost via Z (3× max speed for 3 s, 15% battery, ship-specific cooldown)
+- Victory overlay with FATALITY tag plumbed in (fires for Quantum-Torpedo kills once Phase 3 lands)
+
+### Phase 3 hand-off notes
+
+1. **Transporter Beam + Quantum Torpedo** (Section 6) — full A+B combo, shield-down requirement, 10-second torpedo timer above target, both defense behaviors (transport-behind, transport-back), `MatchManager.lastKillByQuantumTorpedo` plumbing for FATALITY.
+2. **Quantum Singularity Event** (Section 6) — arena-wide debris that damages both ships, chromatic-aberration / lens-distortion visual.
+3. **Cloaking Device** (B+C) — only for ships with `weapons.has_cloak == true`; translucent to player, invisible to AI.
+4. **Self-Destruct** (A+C) — 4-second countdown, devastating blast, kills user + damages opponent.
+5. **All 12 special weapons** — most are duration buffs on the ship; the buff tracker hook already exists on `Ship`. Wire them up driven by the C-button + ship `definition.weapons.special`.
+6. **Section 13 haptic catalog** — fold the full event table into `HapticsSystem` and call from gameplay; remember the critical rule (haptics fire **only for events affecting the human player's ship**).
+7. **Section 12 audio pipeline** — per-ship engine hum, weapon-fire SFX, transporter shimmer, FATALITY sting.
+8. **Pause menu polish** — "Restart Match" and "Quit to Menu" should match Section 9 semantics (restart counts as a loss, quit is a forfeit). Phase 2 currently dismisses to menu for both.
 
 ## Reference repositories (study only)
 

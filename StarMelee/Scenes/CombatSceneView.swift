@@ -10,6 +10,7 @@ struct CombatSceneView: View {
     @StateObject private var gameState = GameState()
     @Environment(\.dismiss) private var dismiss
     @FocusState private var sceneFocused: Bool
+    @State private var sceneRef: CombatScene?
 
     var body: some View {
         ZStack {
@@ -33,8 +34,32 @@ struct CombatSceneView: View {
                 .transition(.opacity)
             }
 
+            // Pause overlay (Section 9 pause menu)
+            if gameState.isPaused {
+                PauseView(
+                    onResume:  { setPaused(false) },
+                    onRestart: { dismiss() },     // Phase 2 stub — full restart-in-place lands later
+                    onQuit:    { dismiss() }
+                )
+                .transition(.opacity)
+            }
+
             VStack {
                 HStack {
+                    Button {
+                        setPaused(true)
+                    } label: {
+                        Text("‖ PAUSE")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .tracking(2)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.black.opacity(0.5))
+                            .overlay(Rectangle().stroke(Color(.sRGB, red: 0, green: 1.0, blue: 0.84), lineWidth: 1))
+                    }
+                    .padding(.top, 8)
+                    .padding(.leading, 16)
                     Spacer()
                     Button {
                         dismiss()
@@ -76,7 +101,14 @@ struct CombatSceneView: View {
         scene.scaleMode = .resizeFill
         scene.input = input
         scene.gameState = gameState
+        // SpriteKit owns the scene; we keep a reference so the pause toggle can reach it.
+        DispatchQueue.main.async { self.sceneRef = scene }
         return scene
+    }
+
+    private func setPaused(_ paused: Bool) {
+        gameState.isPaused = paused
+        sceneRef?.customPaused = paused
     }
 
     // MARK: - Keyboard (Section 10)
@@ -98,8 +130,8 @@ struct CombatSceneView: View {
         case KeyEquivalent("a"): setStickX(pressed ? -1 : 0, ifMatching: -1)
         case .rightArrow:      setStickX(pressed ? 1 : 0, ifMatching: 1)
         case KeyEquivalent("d"): setStickX(pressed ? 1 : 0, ifMatching: 1)
-        case KeyEquivalent("p"): if pressed { /* Phase 2 stub — pause hookup pending */ }
-        case .escape:          if pressed { dismiss() }
+        case KeyEquivalent("p"): if pressed { setPaused(!gameState.isPaused) }
+        case .escape:          if pressed { setPaused(!gameState.isPaused) }
         default:               return .ignored
         }
         return .handled

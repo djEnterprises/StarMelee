@@ -44,6 +44,15 @@ final class Ship: SKNode {
     /// Seconds since this ship last took damage. Used to gate self-heal (Section 7: pauses for 2s after damage).
     private var secondsSinceDamage: TimeInterval = .infinity
 
+    /// Active speed boost — non-zero `remaining` while the ship is boosted.
+    private(set) var speedBoostRemaining: TimeInterval = 0
+    private(set) var speedBoostCooldownRemaining: TimeInterval = 0
+
+    /// Speed-boost configuration (Section 5 universal capability — Section 7 battery cost).
+    private static let boostDurationSeconds: TimeInterval = 3.0
+    private static let boostMultiplier: CGFloat = 3.0
+    private static let boostBatteryCost: CGFloat = 15.0   // % of max battery
+
     // MARK: - Visual nodes
     private let hull: SKShapeNode
     private let thrusterFlare: SKShapeNode
@@ -142,10 +151,11 @@ final class Ship: SKNode {
             let dy = sin(heading) * accelerationPerSecond * dtf
             velocity.dx += dx
             velocity.dy += dy
-            // Clamp to max speed
+            // Clamp to max speed (boost-aware)
+            let cap = effectiveMaxSpeed
             let speed = hypot(velocity.dx, velocity.dy)
-            if speed > maxSpeed {
-                let scale = maxSpeed / speed
+            if speed > cap {
+                let scale = cap / speed
                 velocity.dx *= scale
                 velocity.dy *= scale
             }
@@ -183,8 +193,31 @@ final class Ship: SKNode {
             battery = min(maxBattery, battery + maxBattery * (regenRate / 100.0) * dtf)
         }
 
+        // Speed boost cooldown + active duration tick
+        speedBoostCooldownRemaining = max(0, speedBoostCooldownRemaining - dt)
+        speedBoostRemaining = max(0, speedBoostRemaining - dt)
+
         // allowSpecials is read by the weapon / specials systems; Ship just integrates physics here.
         _ = allowSpecials
+    }
+
+    /// Attempt to engage Speed Boost (universal capability, Section 5 / Section 7).
+    /// Returns true on success, false if locked by cooldown / battery / specials lock.
+    @discardableResult
+    func tryEngageSpeedBoost(allowSpecials: Bool) -> Bool {
+        guard allowSpecials else { return false }
+        guard speedBoostCooldownRemaining <= 0 else { return false }
+        let cost = (Self.boostBatteryCost / 100.0) * maxBattery
+        guard battery >= cost else { return false }
+        battery -= cost
+        speedBoostRemaining = Self.boostDurationSeconds
+        speedBoostCooldownRemaining = TimeInterval(definition.stats.speedBoostCooldownSeconds)
+        return true
+    }
+
+    /// Effective maximum speed including a 3× scaling while boost is active.
+    var effectiveMaxSpeed: CGFloat {
+        speedBoostRemaining > 0 ? maxSpeed * Self.boostMultiplier : maxSpeed
     }
 
     // MARK: - Damage application

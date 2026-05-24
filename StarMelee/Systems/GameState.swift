@@ -31,6 +31,9 @@ final class GameState: ObservableObject {
     @Published var playerWins: Int = 0
     @Published var opponentWins: Int = 0
 
+    // Pause (Section 9 pause menu)
+    @Published var isPaused: Bool = false
+
     // Series end overlay
     @Published var seriesEnded: Bool = false
     @Published var seriesWinnerIsPlayer: Bool = true
