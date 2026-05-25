@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage("settings.buttonOpacity") private var buttonOpacity: Double = 0.7
     @AppStorage("settings.buttonSize") private var buttonSize: Double = 1.0
     @AppStorage("settings.leftHandedMode") private var leftHandedMode: Bool = false
+    @AppStorage("settings.reduceMotion") private var reduceMotion: String = "off"
 
     var body: some View {
         Form {
@@ -46,6 +47,17 @@ struct SettingsView: View {
                     Text("180s").tag(180)
                     Text("300s").tag(300)
                 }
+            }
+
+            Section("Accessibility") {
+                Picker("Reduce Motion", selection: $reduceMotion) {
+                    Text("Off (full effects)").tag("off")
+                    Text("Reduced").tag("reduced")
+                    Text("Disabled").tag("disabled")
+                }
+                Text("Scales camera shake, slow-motion, and shockwave effects.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
 
             Section("About") {

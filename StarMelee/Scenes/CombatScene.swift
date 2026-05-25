@@ -32,6 +32,21 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Match management
     private let matchManager = MatchManager()
 
+    // MARK: - Juice (camera shake, time dilation, shockwaves)
+    private let juice = JuiceSystem()
+
+    // MARK: - Low-HP smoke trails (one per ship)
+    private var playerSmoke: SKEmitterNode?
+    private var enemySmoke: SKEmitterNode?
+
+    // MARK: - Destruction tracking — fires destruction juice exactly once per ship lifecycle
+    private var playerWasDestroyed: Bool = false
+    private var enemyWasDestroyed: Bool = false
+
+    // MARK: - Damage tracking — fires shake/feedback only on rising-edge damage events
+    private var lastPlayerHealth: CGFloat = 1.0
+    private var lastEnemyHealth: CGFloat = 1.0
+
     // MARK: - Pause
     /// When true, the update loop skips ship integration, AI, weapons, gravity, and match-state.
     /// Named `customPaused` because `SKScene.isPaused` already exists and it pauses *actions*
@@ -54,6 +69,12 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         scaleMode = .resizeFill
         physicsWorld.gravity = .zero
         physicsWorld.contactDelegate = self
+
+        // ProMotion / 120Hz support — drives smooth analog stick + camera-follow on capable devices.
+        #if os(iOS)
+        let maxFPS = view.window?.windowScene?.screen.maximumFramesPerSecond ?? 60
+        view.preferredFramesPerSecond = maxFPS
+        #endif
 
         let w = size.width * WorldConstants.worldScaleFactor
         let h = size.height * WorldConstants.worldScaleFactor
@@ -169,7 +190,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Update loop
 
     override func update(_ currentTime: TimeInterval) {
-        let dt = lastUpdate == 0 ? 1.0 / 60.0 : min(0.05, currentTime - lastUpdate)
+        let rawDt = lastUpdate == 0 ? 1.0 / 60.0 : min(0.05, currentTime - lastUpdate)
         lastUpdate = currentTime
 
         if customPaused {
@@ -177,6 +198,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             publishGameState()
             return
         }
+
+        // Apply time dilation to gameplay dt; juice + HUD still tick at real time.
+        let dt = rawDt * TimeInterval(juice.currentTimeScale)
 
         let allowSpecials = matchManager.allowSpecials
 
@@ -283,11 +307,48 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         PhysicsEngine.enforceWorldBounds(ship: playerShip, world: worldRect)
         PhysicsEngine.enforceWorldBounds(ship: enemyShip, world: worldRect)
 
-        // Camera
-        let lerp = WorldConstants.cameraLerp * min(1, CGFloat(dt) * 60)
-        cameraNode.position.x += (playerShip.position.x - cameraNode.position.x) * lerp
-        cameraNode.position.y += (playerShip.position.y - cameraNode.position.y) * lerp
-        clampCameraToWorld()
+        // Camera follow (lerp toward player), then layer juice-system shake on top.
+        let lerp = WorldConstants.cameraLerp * min(1, CGFloat(rawDt) * 60)
+        var followTarget = cameraNode.position
+        followTarget.x += (playerShip.position.x - cameraNode.position.x) * lerp
+        followTarget.y += (playerShip.position.y - cameraNode.position.y) * lerp
+        // Clamp follow target to world before passing to juice (juice adds shake offset on top).
+        followTarget = clampToCameraBounds(followTarget)
+        juice.apply(dt: rawDt, to: cameraNode, cameraTargetPosition: followTarget)
+
+        // Damage detection — shake on rising-edge health drops for the PLAYER only (Section 13).
+        let pf = playerShip.healthFraction
+        if pf < lastPlayerHealth {
+            let drop = lastPlayerHealth - pf
+            if drop > 0.15 { juice.shake(.heavy) }
+            else if drop > 0.05 { juice.shake(.medium) }
+            else { juice.shake(.light) }
+        }
+        lastPlayerHealth = pf
+        lastEnemyHealth = enemyShip.healthFraction
+
+        // Destruction — fire shockwave + slow-mo exactly once per lifecycle.
+        if !playerWasDestroyed && playerShip.isDestroyed {
+            playerWasDestroyed = true
+            juice.spawnDestructionExplosion(at: playerShip.position,
+                                            shipColor: SKColor(red: 0, green: 1.0, blue: 0.84, alpha: 1),
+                                            in: worldNode)
+            juice.slowMo(.shipDestruction)
+            juice.shake(.heavy)
+        }
+        if !enemyWasDestroyed && enemyShip.isDestroyed {
+            enemyWasDestroyed = true
+            juice.spawnDestructionExplosion(at: enemyShip.position,
+                                            shipColor: SKColor(red: 1.0, green: 0.2, blue: 0.4, alpha: 1),
+                                            in: worldNode)
+            juice.slowMo(.shipDestruction)
+            // Player-feedback rule: shake on enemy destruction is mild (player just scored a kill,
+            // it's a satisfying moment, but the violence happened to the other ship).
+            juice.shake(.medium)
+        }
+
+        // Low-HP smoke trails (Section 14 SuperGrok addition)
+        updateLowHPSmoke()
 
         // Match state advance
         if let change = matchManager.update(
@@ -325,11 +386,68 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         }
     }
 
-    private func clampCameraToWorld() {
+    private func clampToCameraBounds(_ p: CGPoint) -> CGPoint {
         let halfW = size.width / 2
         let halfH = size.height / 2
-        cameraNode.position.x = min(max(cameraNode.position.x, worldRect.minX + halfW), worldRect.maxX - halfW)
-        cameraNode.position.y = min(max(cameraNode.position.y, worldRect.minY + halfH), worldRect.maxY - halfH)
+        return CGPoint(
+            x: min(max(p.x, worldRect.minX + halfW), worldRect.maxX - halfW),
+            y: min(max(p.y, worldRect.minY + halfH), worldRect.maxY - halfH)
+        )
+    }
+
+    /// Attach (or detach) a low-HP smoke emitter to each ship based on current health %.
+    /// Section 14 SuperGrok addition: visible <30%, intensifies <15% with orange smoke.
+    private func updateLowHPSmoke() {
+        playerSmoke = updateSmoke(existing: playerSmoke, on: playerShip,
+                                  cleanColor: SKColor(white: 0.7, alpha: 1))
+        enemySmoke  = updateSmoke(existing: enemySmoke, on: enemyShip,
+                                  cleanColor: SKColor(white: 0.7, alpha: 1))
+    }
+
+    private func updateSmoke(existing: SKEmitterNode?, on ship: Ship, cleanColor: SKColor) -> SKEmitterNode? {
+        let hp = ship.healthFraction
+        let needsSmoke = hp < 0.30 && !ship.isDestroyed
+        guard needsSmoke else {
+            existing?.removeFromParent()
+            return nil
+        }
+        let emitter = existing ?? makeSmokeEmitter()
+        if existing == nil {
+            ship.addChild(emitter)
+        }
+        // Critical state: turn smoke orange below 15% and spit more particles.
+        if hp < 0.15 {
+            emitter.particleColor = SKColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 1.0)
+            emitter.particleBirthRate = 25
+        } else {
+            emitter.particleColor = cleanColor
+            emitter.particleBirthRate = 10
+        }
+        return emitter
+    }
+
+    private func makeSmokeEmitter() -> SKEmitterNode {
+        let e = SKEmitterNode()
+        e.particleTexture = nil
+        e.particleBirthRate = 10
+        e.particleLifetime = 1.0
+        e.particleLifetimeRange = 0.4
+        e.particleSize = CGSize(width: 8, height: 8)
+        e.particleScale = 0.6
+        e.particleScaleRange = 0.4
+        e.particleScaleSpeed = 0.5
+        e.particleAlpha = 0.7
+        e.particleAlphaRange = 0.2
+        e.particleAlphaSpeed = -0.7
+        e.particleSpeed = 30
+        e.particleSpeedRange = 20
+        e.particleColor = SKColor(white: 0.7, alpha: 1)
+        e.particleColorBlendFactor = 1
+        e.emissionAngle = -.pi / 2     // backward relative to ship's local +y forward
+        e.emissionAngleRange = 0.6
+        e.zPosition = -1
+        e.position = CGPoint(x: 0, y: -8)   // attach behind the hull
+        return e
     }
 
     private func publishGameState() {
@@ -416,6 +534,14 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         enemyShip.heading = .pi
         playerShip.velocity = .zero
         enemyShip.velocity = .zero
+
+        // Clear juice-system bookkeeping so destruction can fire again next match.
+        playerWasDestroyed = false
+        enemyWasDestroyed = false
+        lastPlayerHealth = 1.0
+        lastEnemyHealth = 1.0
+        playerSmoke?.removeFromParent(); playerSmoke = nil
+        enemySmoke?.removeFromParent(); enemySmoke = nil
     }
 
     // MARK: - Collisions
