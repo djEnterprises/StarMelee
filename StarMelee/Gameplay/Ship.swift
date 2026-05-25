@@ -60,6 +60,11 @@ final class Ship: SKNode {
     /// Active effects on this ship.
     private(set) var activeBuffs: [ShipBuff] = []
 
+    /// Quantum Torpedo currently planted on this ship (Section 6). Detonates when its 10s timer
+    /// expires. The host can press A+B again to defend by transporting it back to the attacker
+    /// (if in range and ship has_transporter).
+    var plantedTorpedo: QuantumTorpedo? = nil
+
     /// Speed-boost configuration (Section 5 universal capability — Section 7 battery cost).
     private static let boostDurationSeconds: TimeInterval = 3.0
     private static let boostMultiplier: CGFloat = 3.0

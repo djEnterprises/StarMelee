@@ -41,6 +41,9 @@ final class MatchManager {
     private(set) var matchNumber: Int = 1
     private(set) var playerWins: Int = 0
     private(set) var opponentWins: Int = 0
+    /// Persists across the inter-match phase so the series-end victory screen knows whether
+    /// to show FATALITY (Section 4 step 8). Reset when a new match starts.
+    private var lastMatchFatality: Bool = false
 
     /// Section 23 #8: gameplay code reads this single flag. Primary + secondary fire ignore it
     /// (they always work in active phases); specials, combos, and boost respect it.
@@ -134,14 +137,15 @@ final class MatchManager {
             let next = remaining - dt
             if next <= 0 {
                 if playerWins >= 2 {
-                    phase = .seriesEnded(winner: .player, fatality: lastKillByQuantumTorpedo)
-                    return .seriesEnded(winner: .player, fatality: lastKillByQuantumTorpedo)
+                    phase = .seriesEnded(winner: .player, fatality: lastMatchFatality)
+                    return .seriesEnded(winner: .player, fatality: lastMatchFatality)
                 }
                 if opponentWins >= 2 {
-                    phase = .seriesEnded(winner: .opponent, fatality: false)
-                    return .seriesEnded(winner: .opponent, fatality: false)
+                    phase = .seriesEnded(winner: .opponent, fatality: lastMatchFatality)
+                    return .seriesEnded(winner: .opponent, fatality: lastMatchFatality)
                 }
                 matchNumber += 1
+                lastMatchFatality = false   // fresh match — reset until something kills again
                 phase = .preMatch(remaining: Self.preMatchSeconds)
                 return .nextMatchStarted(matchNumber: matchNumber)
             }
@@ -162,6 +166,7 @@ final class MatchManager {
     }
 
     private func endMatch(winner: Ship.Side, fatality: Bool) -> PhaseChange {
+        lastMatchFatality = fatality   // remember across the inter-match pause
         phase = .interMatch(remaining: Self.interMatchSeconds)
         return .matchEnded(winner: winner, fatality: fatality)
     }

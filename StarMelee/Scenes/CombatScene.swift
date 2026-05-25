@@ -30,6 +30,13 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     private var powerUpManager: PowerUpManager!
     private var weaponsCatalog: [WeaponDefinition] = []
 
+    /// Active Quantum Torpedoes (one per ship at most — Section 6).
+    private var activeTorpedoes: [QuantumTorpedo] = []
+    private var singularityDebris: [SingularityDebris] = []
+
+    /// Set true on the frame a Quantum Torpedo kills a ship — drives the FATALITY banner.
+    private var lastKillByTorpedo: Bool = false
+
     // Edge-trigger button state — fires specials on rising-edge only, not while held.
     private var lastCHandled: Bool = false
     private var lastABHandled: Bool = false   // Transporter Beam combo
@@ -239,9 +246,12 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         }
         lastCHandled = plainC
 
-        // Stub: these flags drive Iteration J + K combos; we already extract them so the
-        // combo-handler wiring lands in the next file edits without re-reading input again.
-        _ = abCombo
+        // A+B combo: Transporter Beam → Quantum Torpedo (Section 6).
+        if abCombo && !lastABHandled {
+            handleTransporterBeam(from: playerShip, opponent: enemyShip)
+        }
+        lastABHandled = abCombo
+        // B+C and A+C combos wire in iteration K.
         _ = bcCombo
         _ = acCombo
 
@@ -310,6 +320,10 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             if !alive { proj.removeFromParent() }
             return !alive
         }
+
+        // Quantum Torpedo lifecycle — Section 6, ticks even when allowSpecials=false so the
+        // 10s timer doesn't pause if a torpedo somehow lingered across phase boundaries.
+        tickTorpedoes(dt: dt)
 
         // Power-up lifecycle (Section 8: spawn during active match only; despawn after 12s)
         activePowerUps.removeAll { p in
@@ -391,7 +405,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         // Low-HP smoke trails (Section 14 SuperGrok addition)
         updateLowHPSmoke()
 
-        // Match state advance
+        // Match state advance — pipe FATALITY flag through (Section 4 step 8).
         if let change = matchManager.update(
             dt: dt,
             playerDestroyed: playerShip.isDestroyed,
@@ -399,10 +413,13 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             playerHealthFraction: playerShip.healthFraction,
             enemyHealthFraction: enemyShip.healthFraction,
             playerShieldFraction: playerShip.shieldFraction,
-            enemyShieldFraction: enemyShip.shieldFraction
+            enemyShieldFraction: enemyShip.shieldFraction,
+            lastKillByQuantumTorpedo: lastKillByTorpedo
         ) {
             handlePhaseChange(change)
         }
+        // Reset the flag once consumed.
+        lastKillByTorpedo = false
 
         publishGameState()
     }
@@ -589,6 +606,11 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         lastEnemyHealth = 1.0
         playerSmoke?.removeFromParent(); playerSmoke = nil
         enemySmoke?.removeFromParent(); enemySmoke = nil
+
+        // Clear lingering torpedoes (defensive) and singularity debris between matches.
+        for t in activeTorpedoes { t.removeFromParent() }
+        activeTorpedoes.removeAll()
+        clearSingularityDebris()
     }
 
     // MARK: - Collisions
@@ -609,7 +631,17 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             handlePowerUp(pu, collectedBy: ship)
         } else if let pu = (bBody.node as? PowerUp), let ship = (aBody.node as? Ship) {
             handlePowerUp(pu, collectedBy: ship)
+        } else if let debris = (aBody.node as? SingularityDebris), let ship = (bBody.node as? Ship) {
+            handleSingularityHit(debris, ship: ship)
+        } else if let debris = (bBody.node as? SingularityDebris), let ship = (aBody.node as? Ship) {
+            handleSingularityHit(debris, ship: ship)
         }
+    }
+
+    private func handleSingularityHit(_ debris: SingularityDebris, ship: Ship) {
+        ship.takeDamage(SingularityDebris.contactDamage)
+        // Brief shake when the player ship makes contact.
+        if ship.side == .player { juice.shake(.medium) }
     }
 
     private func handlePowerUp(_ pu: PowerUp, collectedBy ship: Ship) {
@@ -653,6 +685,132 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             // The buff already fires; the blast lands when the buff expires (handled in update).
             return
         }
+    }
+
+    // MARK: - Transporter Beam + Quantum Torpedo (Section 6)
+
+    private static let transporterBatteryCostPct: CGFloat = 40
+    private static let transportBackRangeFraction: CGFloat = 0.25  // Section 6 defense option 2
+
+    /// Try to engage the Transporter Beam from `from` aimed at `opponent`.
+    ///
+    /// Three possible flows:
+    /// 1. If a torpedo is already planted on the firing ship's hull, this is a defense-attempt
+    ///    to transport it back to the original attacker (requires being within 25% arena range
+    ///    of the attacker).
+    /// 2. Otherwise plant a torpedo on the opponent if conditions met.
+    /// 3. Otherwise no-op (UI feedback for failure is a Phase 4 polish item).
+    private func handleTransporterBeam(from: Ship, opponent: Ship) {
+        // Defense option 2 — defender is firing back.
+        if let plantedOnSelf = from.plantedTorpedo {
+            attemptTransportBack(torpedo: plantedOnSelf, defender: from, attacker: opponent)
+            return
+        }
+
+        // Otherwise: try to plant a torpedo on the opponent.
+        attemptPlantTorpedo(from: from, target: opponent)
+    }
+
+    private func attemptPlantTorpedo(from: Ship, target: Ship) {
+        guard matchManager.allowSpecials else { return }
+        guard from.definition.weapons.hasTransporter else { return }
+        guard from.transporterCooldownRemaining <= 0 else { return }
+        guard from.quantumTorpedoCount > 0 else { return }
+
+        // Section 6: BOTH shields must be down. We treat <= 5% as "down" so the player doesn't
+        // need an explicit shield-down button (Phase 4 polish DECISION POINT).
+        guard from.shieldFraction <= 0.05 else { return }
+        guard target.shieldFraction <= 0.05 else { return }
+        guard target.plantedTorpedo == nil else { return }   // can't double-stack
+
+        // Battery + ammo
+        let cost = (Self.transporterBatteryCostPct / 100) * from.maxBattery
+        let unlimited = from.side == .player && FunModifiers.shared.unlimitedBattery
+        if !unlimited {
+            guard from.spendBattery(cost) else { return }
+        }
+        from.quantumTorpedoCount -= 1
+        from.transporterCooldownRemaining = TimeInterval(from.definition.stats.transporterCooldownSeconds)
+
+        // Plant!
+        let torpedo = QuantumTorpedo(originalFirer: from.side)
+        torpedo.host = target
+        target.plantedTorpedo = torpedo
+        target.addChild(torpedo)
+        activeTorpedoes.append(torpedo)
+    }
+
+    private func attemptTransportBack(torpedo: QuantumTorpedo, defender: Ship, attacker: Ship) {
+        guard defender.definition.weapons.hasTransporter else { return }
+        // Section 6: only works within 25% of arena range.
+        let dist = hypot(PhysicsEngine.shortestDelta(from: defender.position, to: attacker.position, world: worldRect).dx,
+                         PhysicsEngine.shortestDelta(from: defender.position, to: attacker.position, world: worldRect).dy)
+        let maxRange = min(worldRect.width, worldRect.height) * Self.transportBackRangeFraction
+        guard dist <= maxRange else { return }
+
+        // Defender pays the same battery cost.
+        let cost = (Self.transporterBatteryCostPct / 100) * defender.maxBattery
+        let unlimited = defender.side == .player && FunModifiers.shared.unlimitedBattery
+        if !unlimited {
+            guard defender.spendBattery(cost) else { return }
+        }
+
+        // Move torpedo to attacker.
+        defender.plantedTorpedo = nil
+        attacker.plantedTorpedo = torpedo
+        torpedo.transport(to: attacker)
+    }
+
+    private func tickTorpedoes(dt: TimeInterval) {
+        for torpedo in activeTorpedoes {
+            guard let host = torpedo.host else { continue }
+            let stillTicking = torpedo.tick(dt: dt)
+            if !stillTicking {
+                detonate(torpedo: torpedo, on: host)
+            }
+        }
+        activeTorpedoes.removeAll { $0.host?.plantedTorpedo !== $0 }
+    }
+
+    private func detonate(torpedo: QuantumTorpedo, on host: Ship) {
+        // Section 6: catastrophic damage.
+        let damageBeforeKill = host.health > 0
+        host.takeDamage(host.maxHealth * 2.0)   // overkill — guaranteed destruction if not invulnerable
+
+        // FATALITY flag if the kill was the host's.
+        if damageBeforeKill && host.isDestroyed {
+            lastKillByTorpedo = true
+        }
+
+        // Detach torpedo.
+        host.plantedTorpedo = nil
+        torpedo.removeFromParent()
+
+        // Quantum Singularity Event — spawn 4-6 debris fragments + visual blast.
+        spawnQuantumSingularity(at: host.position)
+        juice.spawnSingularityExplosion(at: host.position, in: worldNode)
+        juice.slowMo(.quantumSingularity)
+        if host.side == .player {
+            juice.shake(.massive)
+        }
+    }
+
+    private func spawnQuantumSingularity(at center: CGPoint) {
+        let count = Int.random(in: 4...6)
+        for _ in 0..<count {
+            let debris = SingularityDebris(radius: CGFloat.random(in: 14...22))
+            // Scatter around the detonation point.
+            let r = CGFloat.random(in: 40...160)
+            let a = CGFloat.random(in: 0...(2 * .pi))
+            debris.position = CGPoint(x: center.x + cos(a) * r, y: center.y + sin(a) * r)
+            worldNode.addChild(debris)
+            singularityDebris.append(debris)
+        }
+    }
+
+    private func clearSingularityDebris() {
+        for d in singularityDebris { d.removeFromParent() }
+        singularityDebris.removeAll()
     }
 
     private func spawnHomingMissileSwarm(from ship: Ship, count: Int, target: Ship) {
