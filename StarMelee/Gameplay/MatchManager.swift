@@ -165,6 +165,16 @@ final class MatchManager {
         }
     }
 
+    /// Forfeit the current match: counts as a loss for the player, advances to inter-match
+    /// or series-end as appropriate. Used by Pause → Restart Match (Section 9).
+    /// - Returns: the resulting PhaseChange so the scene can react (clean projectiles, etc).
+    @discardableResult
+    func forfeitCurrentMatch() -> PhaseChange? {
+        guard case .active = phase else { return nil }
+        opponentWins += 1
+        return endMatch(winner: .opponent, fatality: false)
+    }
+
     private func endMatch(winner: Ship.Side, fatality: Bool) -> PhaseChange {
         lastMatchFatality = fatality   // remember across the inter-match pause
         phase = .interMatch(remaining: Self.interMatchSeconds)

@@ -42,8 +42,16 @@ struct CombatSceneView: View {
             if gameState.isPaused {
                 PauseView(
                     onResume:  { setPaused(false) },
-                    onRestart: { dismiss() },     // Phase 2 stub — full restart-in-place lands later
-                    onQuit:    { dismiss() }
+                    onRestart: {
+                        // Section 9: Restart counts as a loss for the current match.
+                        sceneRef?.restartCurrentMatchAsLoss()
+                        setPaused(false)
+                    },
+                    onQuit:    {
+                        // Section 9: Quit is a forfeit. Phase 4 polish will write a
+                        // forfeit record to the leaderboard once that store lands.
+                        dismiss()
+                    }
                 )
                 .transition(.opacity)
             }

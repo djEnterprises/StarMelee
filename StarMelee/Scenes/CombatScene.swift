@@ -231,7 +231,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         // Edge-trigger speed boost: only engage on the rising edge of Z so a held button
         // doesn't spam boost attempts every frame.
         if zPressed && !lastZHandled {
-            playerShip.tryEngageSpeedBoost(allowSpecials: allowSpecials)
+            if playerShip.tryEngageSpeedBoost(allowSpecials: allowSpecials) {
+                HapticsSystem.shared.play(.speedBoostEngage)
+            }
         }
         lastZHandled = zPressed
 
@@ -306,10 +308,12 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         if canControlPlayer && firing1, let shot = playerPrimary.fire(from: playerShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
+            HapticsSystem.shared.play(.primaryFire)
         }
         if canControlPlayer && firing2, let shot = playerSecondary.fire(from: playerShip, target: enemyShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
+            HapticsSystem.shared.play(.secondaryFire)
         }
         if aiFirePrimary, let shot = enemyPrimary.fire(from: enemyShip) {
             worldNode.addChild(shot)
@@ -390,13 +394,22 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         followTarget = clampToCameraBounds(followTarget)
         juice.apply(dt: rawDt, to: cameraNode, cameraTargetPosition: followTarget)
 
-        // Damage detection — shake on rising-edge health drops for the PLAYER only (Section 13).
+        // Damage detection — shake + haptics on rising-edge health drops for the PLAYER only.
+        // Section 13 critical rule: never haptic for AI-side events.
         let pf = playerShip.healthFraction
         if pf < lastPlayerHealth {
             let drop = lastPlayerHealth - pf
-            if drop > 0.15 { juice.shake(.heavy) }
-            else if drop > 0.05 { juice.shake(.medium) }
-            else { juice.shake(.light) }
+            let dropHP = drop * playerShip.maxHealth
+            if dropHP > 15 {
+                juice.shake(.heavy)
+                HapticsSystem.shared.play(.damageHeavy)
+            } else if dropHP > 5 {
+                juice.shake(.medium)
+                HapticsSystem.shared.play(.damageMedium)
+            } else {
+                juice.shake(.light)
+                HapticsSystem.shared.play(.damageLight)
+            }
         }
         lastPlayerHealth = pf
         lastEnemyHealth = enemyShip.healthFraction
@@ -409,6 +422,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
                                             in: worldNode)
             juice.slowMo(.shipDestruction)
             juice.shake(.heavy)
+            HapticsSystem.shared.play(.playerDestroyed)
         }
         if !enemyWasDestroyed && enemyShip.isDestroyed {
             enemyWasDestroyed = true
@@ -591,18 +605,27 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     private func handlePhaseChange(_ change: MatchManager.PhaseChange) {
         switch change {
         case .countdownEnded:
-            // No-op visually for now; haptics + sound will land in Phase 3/4.
-            break
-        case .matchEnded:
+            HapticsSystem.shared.play(.matchStart)
+        case .matchEnded(let winner, let fatality):
             // Active projectiles cleared so next match starts clean.
             for p in activeProjectiles { p.removeFromParent() }
             activeProjectiles.removeAll()
+            if winner == .player {
+                HapticsSystem.shared.play(.roundWonByPlayer)
+            } else {
+                HapticsSystem.shared.play(.roundLostByPlayer)
+            }
+            if fatality { HapticsSystem.shared.play(.fatality) }
         case .nextMatchStarted:
             // Section 4 step 6: ships reset to 100% and respawn.
             resetShipsForNextMatch()
-        case .seriesEnded:
-            // CombatSceneView observes GameState.seriesEnded and presents the overlay.
-            break
+            HapticsSystem.shared.play(.matchStart)
+        case .seriesEnded(let winner, _):
+            if winner == .player {
+                HapticsSystem.shared.play(.seriesVictory)
+            } else {
+                HapticsSystem.shared.play(.seriesDefeat)
+            }
         }
     }
 
@@ -657,6 +680,16 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         }
     }
 
+    // MARK: - Public hooks (called by CombatSceneView)
+
+    /// Section 9: Pause → Restart Match counts as a loss for the current match. Forfeit the
+    /// current match in MatchManager; the next-match flow kicks in automatically.
+    func restartCurrentMatchAsLoss() {
+        if let change = matchManager.forfeitCurrentMatch() {
+            handlePhaseChange(change)
+        }
+    }
+
     private func handleSingularityHit(_ debris: SingularityDebris, ship: Ship) {
         ship.takeDamage(SingularityDebris.contactDamage)
         // Brief shake when the player ship makes contact.
@@ -668,6 +701,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         if extraTime > 0 {
             matchManager.extendActiveTimer(by: extraTime)
         }
+        if ship.side == .player { HapticsSystem.shared.play(.powerUpCollected) }
         pu.removeFromParent()
         activePowerUps.removeAll { $0 === pu }
     }
@@ -696,13 +730,15 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
 
     private func applySpecialResult(_ result: SpecialWeaponResult, for ship: Ship, opponent: Ship) {
         switch result {
-        case .fired, .rejected:
+        case .fired:
+            if ship.side == .player { HapticsSystem.shared.play(.specialFire) }
+        case .rejected:
             return
         case .spawnHomingMissiles(let count):
             spawnHomingMissileSwarm(from: ship, count: count, target: opponent)
+            if ship.side == .player { HapticsSystem.shared.play(.specialFire) }
         case .armedSelfDestruct:
-            // The buff already fires; the blast lands when the buff expires (handled in update).
-            return
+            if ship.side == .player { HapticsSystem.shared.play(.selfDestructArmed) }
         }
     }
 
@@ -721,6 +757,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             guard ship.spendBattery(cost) else { return }
         }
         ship.applyBuff(ShipBuff(kind: .cloaked, remainingSeconds: 8, magnitude: 0))
+        if ship.side == .player { HapticsSystem.shared.play(.cloakEngage) }
     }
 
     // MARK: - Self-Destruct (A+C combo, Section 5)
@@ -733,6 +770,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         guard matchManager.allowSpecials else { return }
         guard !ship.hasBuff(.selfDestructArmed) else { return }   // already armed
         ship.applyBuff(ShipBuff(kind: .selfDestructArmed, remainingSeconds: 4, magnitude: 0))
+        if ship.side == .player { HapticsSystem.shared.play(.selfDestructArmed) }
     }
 
     /// Big radial blast — kills the source, damages anything in range.
@@ -807,6 +845,11 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         target.plantedTorpedo = torpedo
         target.addChild(torpedo)
         activeTorpedoes.append(torpedo)
+
+        // Haptic: player feels their own transporter engage, OR if a torpedo just landed on
+        // them as the target (Section 13).
+        if from.side == .player { HapticsSystem.shared.play(.transporterEngage) }
+        if target.side == .player { HapticsSystem.shared.play(.torpedoPlantedOnPlayer) }
     }
 
     private func attemptTransportBack(torpedo: QuantumTorpedo, defender: Ship, attacker: Ship) {
