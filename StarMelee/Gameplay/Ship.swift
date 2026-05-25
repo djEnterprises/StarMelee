@@ -283,6 +283,13 @@ final class Ship: SKNode {
             let mag = buffMagnitude(.repairDrone)
             adjustHealth(by: mag * maxHealth * CGFloat(dt))
         }
+        // Cloak drains 5%/s of max battery (Section 7). Running out doesn't auto-cancel here
+        // because we want cloak to expire on duration, not battery — but if the player has
+        // unlimitedBattery the drain no-ops via spendBattery.
+        if hasBuff(.cloaked) {
+            let cloakDrainPerSecond = maxBattery * 0.05
+            _ = spendBattery(cloakDrainPerSecond * CGFloat(dt))
+        }
         // Drop expired buffs
         activeBuffs.removeAll { $0.remainingSeconds <= 0 }
     }

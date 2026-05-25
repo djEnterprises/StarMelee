@@ -251,9 +251,18 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             handleTransporterBeam(from: playerShip, opponent: enemyShip)
         }
         lastABHandled = abCombo
-        // B+C and A+C combos wire in iteration K.
-        _ = bcCombo
-        _ = acCombo
+
+        // B+C combo: Cloaking Device (Section 5 universal capability for has_cloak ships).
+        if bcCombo && !lastBCHandled {
+            engageCloak(on: playerShip)
+        }
+        lastBCHandled = bcCombo
+
+        // A+C combo: Self-Destruct (universal, Section 5).
+        if acCombo && !lastACHandled {
+            armSelfDestruct(on: playerShip)
+        }
+        lastACHandled = acCombo
 
         // Phase 1: ships only move/fire when not in series-end. During pre-match we DO allow
         // primary + secondary firing (Section 23 #2) and movement; specials are locked.
@@ -324,6 +333,16 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         // Quantum Torpedo lifecycle — Section 6, ticks even when allowSpecials=false so the
         // 10s timer doesn't pause if a torpedo somehow lingered across phase boundaries.
         tickTorpedoes(dt: dt)
+
+        // Self-Destruct: when the armed buff has just expired, detonate.
+        if playerShip.selfDestructJustExpired {
+            playerShip.selfDestructJustExpired = false
+            detonateSelfDestruct(on: playerShip, opponent: enemyShip)
+        }
+        if enemyShip.selfDestructJustExpired {
+            enemyShip.selfDestructJustExpired = false
+            detonateSelfDestruct(on: enemyShip, opponent: playerShip)
+        }
 
         // Power-up lifecycle (Section 8: spawn during active match only; despawn after 12s)
         activePowerUps.removeAll { p in
@@ -685,6 +704,56 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             // The buff already fires; the blast lands when the buff expires (handled in update).
             return
         }
+    }
+
+    // MARK: - Cloak (B+C combo, Section 5)
+
+    /// Engage cloaking device. Only ships with `has_cloak == true` can use this combo.
+    /// 8-second duration, 40% battery cost, drains 5% per second while cloaked.
+    private func engageCloak(on ship: Ship) {
+        guard matchManager.allowSpecials else { return }
+        guard ship.definition.weapons.hasCloak else { return }
+        guard !ship.hasBuff(.cloaked) else { return }   // already cloaked, no-op
+
+        let cost = (40.0 / 100) * ship.maxBattery
+        let unlimited = ship.side == .player && FunModifiers.shared.unlimitedBattery
+        if !unlimited {
+            guard ship.spendBattery(cost) else { return }
+        }
+        ship.applyBuff(ShipBuff(kind: .cloaked, remainingSeconds: 8, magnitude: 0))
+    }
+
+    // MARK: - Self-Destruct (A+C combo, Section 5)
+
+    private static let selfDestructBlastRadius: CGFloat = 220
+    private static let selfDestructDamage: CGFloat = 80
+
+    /// Arm the self-destruct sequence on `ship`. 4-second countdown — Section 6.
+    private func armSelfDestruct(on ship: Ship) {
+        guard matchManager.allowSpecials else { return }
+        guard !ship.hasBuff(.selfDestructArmed) else { return }   // already armed
+        ship.applyBuff(ShipBuff(kind: .selfDestructArmed, remainingSeconds: 4, magnitude: 0))
+    }
+
+    /// Big radial blast — kills the source, damages anything in range.
+    private func detonateSelfDestruct(on source: Ship, opponent: Ship) {
+        // Visual + audio + slow-mo (player only)
+        juice.spawnSingularityExplosion(at: source.position, in: worldNode)
+        juice.slowMo(.shipDestruction)
+        if source.side == .player { juice.shake(.massive) }
+
+        // Radial damage to opponent (and any other ships in future — supports >2 ships)
+        let dx = PhysicsEngine.shortestDelta(from: source.position, to: opponent.position, world: worldRect).dx
+        let dy = PhysicsEngine.shortestDelta(from: source.position, to: opponent.position, world: worldRect).dy
+        let dist = hypot(dx, dy)
+        if dist < Self.selfDestructBlastRadius {
+            // Linear falloff
+            let falloff = 1 - (dist / Self.selfDestructBlastRadius)
+            opponent.takeDamage(Self.selfDestructDamage * falloff)
+        }
+
+        // Source is always destroyed by their own bomb
+        source.takeDamage(source.maxHealth * 2)
     }
 
     // MARK: - Transporter Beam + Quantum Torpedo (Section 6)
