@@ -203,15 +203,19 @@ final class Ship: SKNode {
 
     /// Attempt to engage Speed Boost (universal capability, Section 5 / Section 7).
     /// Returns true on success, false if locked by cooldown / battery / specials lock.
+    /// Fun Modifiers: unlimitedBoost zeroes cooldown + cost for the player ship only.
     @discardableResult
     func tryEngageSpeedBoost(allowSpecials: Bool) -> Bool {
         guard allowSpecials else { return false }
-        guard speedBoostCooldownRemaining <= 0 else { return false }
-        let cost = (Self.boostBatteryCost / 100.0) * maxBattery
-        guard battery >= cost else { return false }
-        battery -= cost
+        let unlimited = side == .player && FunModifiers.shared.unlimitedBoost
+        if !unlimited {
+            guard speedBoostCooldownRemaining <= 0 else { return false }
+            let cost = (Self.boostBatteryCost / 100.0) * maxBattery
+            guard battery >= cost else { return false }
+            battery -= cost
+        }
         speedBoostRemaining = Self.boostDurationSeconds
-        speedBoostCooldownRemaining = TimeInterval(definition.stats.speedBoostCooldownSeconds)
+        speedBoostCooldownRemaining = unlimited ? 0 : TimeInterval(definition.stats.speedBoostCooldownSeconds)
         return true
     }
 
@@ -224,8 +228,10 @@ final class Ship: SKNode {
 
     /// Apply incoming damage. Returns the amount actually subtracted from health.
     /// Section 7: shield absorbs first, then health.
+    /// Fun Modifiers: when invincibility is on AND this is the player ship, no damage applies.
     @discardableResult
     func takeDamage(_ amount: CGFloat) -> CGFloat {
+        if side == .player && FunModifiers.shared.invincibility { return 0 }
         secondsSinceDamage = 0
         var remaining = amount
 

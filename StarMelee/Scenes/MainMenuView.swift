@@ -34,6 +34,7 @@ struct MainMenuView: View {
                         MenuButton(label: "PLAY") { path.append(MenuRoute.shipSelect) }
                         MenuButton(label: "SHIP COMPENDIUM") { path.append(MenuRoute.compendium) }
                         MenuButton(label: "SETTINGS") { path.append(MenuRoute.settings) }
+                        MenuButton(label: "FUN MODIFIERS") { path.append(MenuRoute.funModifiers) }
                     }
 
                     Spacer()
@@ -49,6 +50,7 @@ struct MainMenuView: View {
                 case .shipSelect: ShipSelectView(path: $path)
                 case .compendium: CompendiumView()
                 case .settings: SettingsView()
+                case .funModifiers: FunModifiersView()
                 case .combat(let shipID): CombatSceneView(playerShipID: shipID)
                 }
             }
@@ -64,6 +66,7 @@ enum MenuRoute: Hashable {
     case shipSelect
     case compendium
     case settings
+    case funModifiers
     case combat(shipID: String)
 }
 

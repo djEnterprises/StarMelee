@@ -64,10 +64,53 @@ placeholder SpriteKit arena with a parallax starfield. No ships yet — those la
 The plan splits work into five phases:
 
 1. **Core Combat Prototype** — project skeleton, menu shell, empty arena. ✅ *done*
-2. **Combat Depth** — all 12 ships, weapons, HUD, AI, 2-of-3 match series. ✅ *done (Phase 3 polish items below)*
+2. **Combat Depth** — all 12 ships, weapons, HUD, AI, 2-of-3 match series. ✅ *done*
 3. **Special Mechanics** — Transporter Beam, Quantum Torpedo, Singularity, Cloak, Self-Destruct. *(current)*
 4. **Audio + Compendium + Polish** — music, SFX, 3D ship rotator, settings, leaderboard.
 5. **IAP + macOS + Submission** — StoreKit 2, Mac Catalyst build, TestFlight, App Store.
+
+### SuperGrok additions in place
+
+The SuperGrok 2026-05-25 addendum (`SuperGrok/STAR_MELEE_PLAN.md`) layered in a number of polish features that have been integrated:
+
+- **Visual juice** — camera shake (4 amplitudes), time-dilation slow-mo on heavy events, layered shockwave rings on destruction, low-HP smoke trail that turns orange below 15%, 120Hz ProMotion support on capable devices.
+- **Toroidal world wrap** — classic Star Control identity. `WorldConstants.worldMode` defaults to `.toroidal`; flip to `.bounded` to restore the wall-bounce Phase 2 behavior in one line.
+- **Accessibility — Reduce Motion** setting (off / reduced / disabled) scales all juice effects.
+- **First-match onboarding hints** — translucent labels fade per-input.
+- **Fun Modifiers** screen — Invincibility, Unlimited Battery, Unlimited Boost, Infinite Power-Ups, No Planet Gravity, plus Unlimited Specials + No Ship Inertia stubs wired for Phase 3 / 4. Any active modifier disables Game Center submission and flags the victory screen.
+- **`VersionCheckManager`** — reusable App Store update reminder. Drops into every future djEnterprises app.
+- **`GameCenterManager`** scaffold — offline-safe stub; ready when ASC is configured.
+- **`InputSource` / `GamepadInputSource`** — PS5 DualSense + Xbox controllers auto-connect and feed the same `InputState` that touch and keyboard use.
+
+### What's playable right now
+
+- Main menu → Ship Select grid showing all 12 ship silhouettes filtered by faction
+- Toroidal 16×16-viewport arena with 10–14 procedurally placed planets
+- 10-second pre-match practice phase with semi-transparent countdown and PRACTICE banner
+- Full 2-of-3 series with 2-minute match timer
+- Captain-difficulty AI opponent with wrap-aware targeting
+- 4 instant power-up types (life / battery / shield / timer-extension); 6 more reserved for Phase 3
+- Tactical Minimap, off-screen enemy indicator, gravity ramp, multi-planet field
+- PS5-style analog joystick + 6-button cluster on iOS
+- W A S D + Space/F/G + Esc/P keyboard map on Mac Catalyst
+- PS5 / Xbox controller plug-and-play via `GameController` framework
+- Pause overlay (HUD button or Esc/P)
+- Speed Boost (Z, 3× speed for 3 s, 15% battery)
+- Camera shake + slow-mo + shockwave on destruction
+- Low-HP smoke trail with critical-state orange variant
+- Fun Modifiers / cheats panel in the main menu
+- First-match-only hint overlay
+
+## Revert / safety
+
+Phase 2 stable state is tagged in git for safety:
+
+```bash
+git tag -l                              # confirms phase2-stable exists
+git reset --hard phase2-stable          # nukes all SuperGrok-era commits
+```
+
+The Phase 2 stable point includes everything through commit `5681d68` ("pause, Speed Boost, README refresh"). SuperGrok additions land in commits after that tag — list them with `git log phase2-stable..HEAD --oneline`.
 
 ### What's playable right now
 
@@ -85,6 +128,27 @@ The plan splits work into five phases:
 - Pause overlay (HUD button or Esc/P) — freezes ship, weapons, AI, gravity, match timer
 - Speed Boost via Z (3× max speed for 3 s, 15% battery, ship-specific cooldown)
 - Victory overlay with FATALITY tag plumbed in (fires for Quantum-Torpedo kills once Phase 3 lands)
+
+### Audio sources (Phase 4 — verified CC0 / commercial-safe)
+
+When the Phase 4 audio pipeline lands, source from these packs only. Never sample or
+"style after" a copyrighted commercial track — see Section 12 of the plan.
+
+**Music** (looping background tracks):
+- alkakrab on itch.io — Free Sci-Fi Game Music Pack Vol. 1 / 2 / 3 (free commercial, no attribution)
+- White Bat Audio Free Horror/Sci-Fi pack — 27 retro synth tracks (requires credit: "Music by Karl Casey @ White Bat Audio")
+- OpenGameArt.org — search "sci-fi music," "space ambient" (filter to CC0)
+- 99Sounds.org — InterSpace + similar sci-fi atmosphere packs
+
+**Sound effects** (lasers, explosions, thrust, impacts, power-ups, shields):
+- Kenney.nl/assets → Sci-fi Sounds (CC0, no attribution)
+- OpenGameArt.org — "60 CC0 Sci-Fi SFX," "50 CC0 Sci-Fi SFX," etc.
+
+**Ship sprites** (Phase 4+ when promoting from polygon silhouettes):
+- Kenney.nl Spaceship Pack / Space Kit
+- OpenGameArt.org Spaceship Assets
+
+When any pack requires attribution, add the credit line under Settings → About → Credits.
 
 ### Phase 3 hand-off notes
 

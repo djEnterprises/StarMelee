@@ -379,6 +379,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func applyPlanetGravity(to ship: Ship, dt: TimeInterval) {
+        // Fun Modifier: noPlanetGravity disables the gravity force entirely (collision damage
+        // still applies because that's a separate SpriteKit physics contact).
+        if FunModifiers.shared.noPlanetGravity { return }
         let ramp = matchManager.gravityRampFactor
         guard ramp > 0 else { return }
         let G: CGFloat = 18000   // tuned for ~Star Control style influence at ~150 unit range

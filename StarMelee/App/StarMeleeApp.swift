@@ -2,6 +2,16 @@ import SwiftUI
 
 @main
 struct StarMeleeApp: App {
+    init() {
+        // Non-blocking Game Center authentication. Safe to call even when Game Center is not
+        // configured in App Store Connect yet — the manager handles that quietly.
+        GameCenterManager.shared.authenticate()
+
+        // App Store version check (no-op until Daniel sets the Apple App ID after first publish).
+        // VersionCheckManager.shared.appleAppID = "1234567890"
+        Task { _ = await VersionCheckManager.shared.checkForUpdate() }
+    }
+
     var body: some Scene {
         WindowGroup {
             MainMenuView()

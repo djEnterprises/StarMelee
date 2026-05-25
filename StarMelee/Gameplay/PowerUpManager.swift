@@ -40,11 +40,17 @@ final class PowerUpManager {
 
         // Adaptive boost: if either ship is below 25% HP, decrement faster (Section 8).
         let adaptive = min(playerHealthFraction, enemyHealthFraction) < 0.25
-        let multiplier: TimeInterval = adaptive ? 2.0 : 1.0
+        // Fun Modifier: infinitePowerUps adds a 3× multiplier on top of any adaptive boost.
+        let funMultiplier: TimeInterval = FunModifiers.shared.infinitePowerUps ? 3.0 : 1.0
+        let multiplier: TimeInterval = (adaptive ? 2.0 : 1.0) * funMultiplier
         secondsUntilNextSpawn -= dt * multiplier
 
         guard secondsUntilNextSpawn <= 0, let chosen = weightedPick() else { return nil }
-        secondsUntilNextSpawn = TimeInterval.random(in: 15...30)
+        // With infinitePowerUps, also shrink the next-spawn delay window so the arena is rich.
+        let respawnRange: ClosedRange<TimeInterval> = FunModifiers.shared.infinitePowerUps
+            ? 5...10
+            : 15...30
+        secondsUntilNextSpawn = TimeInterval.random(in: respawnRange)
 
         // Section 4 + 8: spawn near the midpoint between ships, with an adaptive bias toward the
         // low-health ship so they can plausibly reach it.

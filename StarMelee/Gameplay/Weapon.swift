@@ -48,7 +48,9 @@ final class Weapon {
 
 extension Ship {
     /// Attempt to spend battery. Returns false if not enough.
+    /// Fun Modifiers: unlimitedBattery makes the spend a no-op for the player ship only.
     func spendBattery(_ amount: CGFloat) -> Bool {
+        if side == .player && FunModifiers.shared.unlimitedBattery { return true }
         guard amount <= battery else { return false }
         battery -= amount
         return true

@@ -66,8 +66,10 @@ final class PowerUp: SKNode {
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) not used") }
 
     /// Returns false when the power-up has been collected or should despawn.
+    /// Fun Modifier: infinitePowerUps disables the despawn timer.
     func tick(dt: TimeInterval) -> Bool {
         ageSeconds += dt
+        if FunModifiers.shared.infinitePowerUps { return true }
         return ageSeconds < Self.despawnSeconds
     }
 

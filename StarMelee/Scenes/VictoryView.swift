@@ -31,6 +31,22 @@ struct VictoryView: View {
                         .padding(.top, 12)
                 }
 
+                // SuperGrok Section 16.5: when any Fun Modifier is active, flag the result
+                // so the player knows this run isn't eligible for Game Center submission.
+                if FunModifiers.shared.anyActive {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text("MODIFIERS ACTIVE — score not submitted")
+                    }
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.black.opacity(0.6))
+                    .overlay(Rectangle().stroke(.orange, lineWidth: 1))
+                    .padding(.top, 4)
+                }
+
                 HStack(spacing: 12) {
                     Button("REPLAY", action: onReplay)
                     Button("CHANGE SHIP", action: onChangeShip)

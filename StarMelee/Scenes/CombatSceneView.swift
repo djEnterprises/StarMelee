@@ -11,6 +11,7 @@ struct CombatSceneView: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var sceneFocused: Bool
     @State private var sceneRef: CombatScene?
+    @State private var gamepadSource: GamepadInputSource?
 
     var body: some View {
         ZStack {
@@ -94,7 +95,12 @@ struct CombatSceneView: View {
         .navigationBarBackButtonHiddenIfAvailable()
         .focusable()
         .focused($sceneFocused)
-        .onAppear { sceneFocused = true }
+        .onAppear {
+            sceneFocused = true
+            if gamepadSource == nil {
+                gamepadSource = GamepadInputSource(inputState: input)
+            }
+        }
         .onKeyPress(phases: [.down, .up]) { press in handleKey(press) }
     }
 
