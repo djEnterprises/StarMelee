@@ -23,6 +23,9 @@ struct CombatSceneView: View {
 
             CombatHUDOverlay(gameState: gameState)
 
+            // First-match onboarding hints — no-op after the player completes their first match.
+            OnboardingHintsOverlay(input: input)
+
             if gameState.seriesEnded {
                 VictoryView(
                     winnerName: gameState.seriesWinnerIsPlayer ? gameState.playerName : gameState.enemyName,

@@ -92,8 +92,14 @@ final class Projectile: SKNode {
         position.x += velocity.dx * dtf
         position.y += velocity.dy * dtf
 
-        // Projectiles die at world bounds (Section 4: "Projectiles that leave the world bounds are destroyed").
-        if !world.contains(position) { return false }
+        switch WorldConstants.worldMode {
+        case .toroidal:
+            // Projectiles wrap with the world. Lifetime still kills them eventually.
+            PhysicsEngine.wrap(node: self, world: world)
+        case .bounded:
+            // Section 4: projectiles leaving the bounded world are destroyed.
+            if !world.contains(position) { return false }
+        }
         return true
     }
 

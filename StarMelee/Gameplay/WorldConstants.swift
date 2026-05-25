@@ -1,11 +1,28 @@
 import CoreGraphics
 import Foundation
 
+/// Boundary behavior at the edges of the world. Section 4 originally specified bounded walls
+/// with bounce; the SuperGrok addendum reinstates classic Star Control's toroidal wrapping.
+/// We keep both behaviors available behind this enum so playtesting can compare.
+enum WorldMode {
+    /// Classic Star Control identity: position wraps modulo `worldSize`. No walls. The camera
+    /// wraps with the player; AI targeting + off-screen indicator use the shortest wrap-aware
+    /// vector. Projectiles wrap too — they die from their lifetime, not from leaving bounds.
+    case toroidal
+
+    /// Bounded world with 45% velocity loss on wall bounces; projectiles die at bounds.
+    case bounded
+}
+
 /// Tunable physics & world constants.
 ///
 /// **Plan reference:** Section 4 (Arena Dimensions & Camera) and Section 23 (mockup fixes).
 /// These live in one file so playtesting tweaks are a one-line change.
 enum WorldConstants {
+
+    /// Current world boundary mode. Default toroidal per SuperGrok addendum + classic SC feel.
+    /// Change to `.bounded` to restore the wall-bounce behavior used in Phase 2 commits.
+    static let worldMode: WorldMode = .toroidal
 
     // MARK: - Arena
 

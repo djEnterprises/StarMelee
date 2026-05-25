@@ -236,7 +236,8 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         let aiDecision = aiController.decide(dt: dt,
                                              ownShip: enemyShip,
                                              target: playerShip,
-                                             allowSpecials: allowSpecials)
+                                             allowSpecials: allowSpecials,
+                                             world: worldRect)
         let aiCadenceCutPrimary: CGFloat = matchManager.allowSpecials ? 1.0 : 0.6
         let aiCadenceCutSecondary: CGFloat = matchManager.allowSpecials ? 1.0 : 0.2
         let aiFirePrimary = aiDecision.firePrimary && CGFloat.random(in: 0...1) < aiCadenceCutPrimary
@@ -303,9 +304,20 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             }
         }
 
-        // World boundary
-        PhysicsEngine.enforceWorldBounds(ship: playerShip, world: worldRect)
-        PhysicsEngine.enforceWorldBounds(ship: enemyShip, world: worldRect)
+        // World boundary — wrap in toroidal mode, bounce in bounded mode.
+        // When the player wraps, mirror the same delta onto the camera so the view never jumps.
+        let playerWrapDelta = PhysicsEngine.enforceWorldBoundaries(ship: playerShip, world: worldRect)
+        PhysicsEngine.enforceWorldBoundaries(ship: enemyShip, world: worldRect)
+        // Power-ups wrap too in toroidal mode (so they don't fall off the world).
+        if WorldConstants.worldMode == .toroidal {
+            for pu in activePowerUps {
+                PhysicsEngine.wrap(node: pu, world: worldRect)
+            }
+        }
+        if playerWrapDelta.dx != 0 || playerWrapDelta.dy != 0 {
+            cameraNode.position.x += playerWrapDelta.dx
+            cameraNode.position.y += playerWrapDelta.dy
+        }
 
         // Camera follow (lerp toward player), then layer juice-system shake on top.
         let lerp = WorldConstants.cameraLerp * min(1, CGFloat(rawDt) * 60)
@@ -387,6 +399,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func clampToCameraBounds(_ p: CGPoint) -> CGPoint {
+        // In toroidal mode there are no walls — the camera can sit anywhere because the
+        // wrap math keeps everything visible. Clamp only in bounded mode.
+        guard WorldConstants.worldMode == .bounded else { return p }
         let halfW = size.width / 2
         let halfH = size.height / 2
         return CGPoint(
@@ -491,12 +506,12 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         let cameraRect = CGRect(x: cameraPos.x - halfW, y: cameraPos.y - halfH,
                                 width: size.width, height: size.height)
         gs.enemyOnScreen = cameraRect.contains(enemyShip.position)
-        gs.enemyScreenDirection = CGVector(
-            dx: enemyShip.position.x - cameraPos.x,
-            dy: -(enemyShip.position.y - cameraPos.y)
-        )
-        gs.enemyDistanceUnits = hypot(playerShip.position.x - enemyShip.position.x,
-                                      playerShip.position.y - enemyShip.position.y)
+        // Use wrap-aware delta so the off-screen indicator always points to the closest path
+        // through the world (which in toroidal mode may be the short way around an edge).
+        let camToEnemy = PhysicsEngine.shortestDelta(from: cameraPos, to: enemyShip.position, world: worldRect)
+        gs.enemyScreenDirection = CGVector(dx: camToEnemy.dx, dy: -camToEnemy.dy)
+        let playerToEnemy = PhysicsEngine.shortestDelta(from: playerShip.position, to: enemyShip.position, world: worldRect)
+        gs.enemyDistanceUnits = hypot(playerToEnemy.dx, playerToEnemy.dy)
 
         // Minimap (Section 4)
         gs.cameraViewport = cameraRect

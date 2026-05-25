@@ -37,7 +37,12 @@ final class AIController {
     }
 
     /// Produce a per-frame decision for the given ship + target.
-    func decide(dt: TimeInterval, ownShip: Ship, target: Ship, allowSpecials: Bool) -> AIDecision {
+    /// - Parameter world: used for toroidal wrap-aware shortest-path targeting.
+    func decide(dt: TimeInterval,
+                ownShip: Ship,
+                target: Ship,
+                allowSpecials: Bool,
+                world: CGRect) -> AIDecision {
         guard !ownShip.isDestroyed, !target.isDestroyed else {
             return AIDecision(thrust: false, brake: false, turn: 0, firePrimary: false, fireSecondary: false)
         }
@@ -49,9 +54,11 @@ final class AIController {
             secondsUntilAimRefresh = TimeInterval.random(in: 0.4...1.2)
         }
 
-        // Threat assessment (Section 15 step 1).
-        let dx = target.position.x - ownShip.position.x
-        let dy = target.position.y - ownShip.position.y
+        // Threat assessment (Section 15 step 1). Use the shortest wrap-aware vector — in toroidal
+        // mode the target might be "closer" through an edge wrap than across the world.
+        let v = PhysicsEngine.shortestDelta(from: ownShip.position, to: target.position, world: world)
+        let dx = v.dx
+        let dy = v.dy
         let dist = hypot(dx, dy)
         let bearingToTarget = atan2(dy, dx)
         let headingError = normalize(bearingToTarget + aimError - ownShip.heading)
