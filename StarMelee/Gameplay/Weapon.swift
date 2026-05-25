@@ -24,9 +24,10 @@ final class Weapon {
     var isReady: Bool { secondsUntilReady <= 0 }
 
     /// Returns a freshly spawned projectile if the weapon was ready, otherwise nil.
-    /// Resets the cooldown when it fires.
+    /// Resets the cooldown when it fires. EM-disrupted ships cannot fire.
     func fire(from ship: Ship, target: Ship? = nil) -> Projectile? {
         guard isReady else { return nil }
+        guard !ship.isEMDisrupted else { return nil }
         // Battery cost
         guard ship.spendBattery(CGFloat(definition.batteryCost)) else { return nil }
 
@@ -41,7 +42,8 @@ final class Weapon {
             firedBy: ship.side,
             startPosition: start,
             startHeading: ship.heading,
-            homingTarget: target
+            homingTarget: target,
+            outgoingMultiplier: ship.outgoingDamageMultiplier
         )
     }
 }

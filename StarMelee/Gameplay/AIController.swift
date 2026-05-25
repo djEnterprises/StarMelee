@@ -10,6 +10,7 @@ struct AIDecision {
     let turn: CGFloat       // -1 (left), 0 (hold), +1 (right)
     let firePrimary: Bool
     let fireSecondary: Bool
+    let fireSpecial: Bool
 }
 
 /// Simple behavior-tree-style AI opponent.
@@ -44,13 +45,17 @@ final class AIController {
                 allowSpecials: Bool,
                 world: CGRect) -> AIDecision {
         guard !ownShip.isDestroyed, !target.isDestroyed else {
-            return AIDecision(thrust: false, brake: false, turn: 0, firePrimary: false, fireSecondary: false)
+            return AIDecision(thrust: false, brake: false, turn: 0,
+                              firePrimary: false, fireSecondary: false, fireSpecial: false)
         }
 
         // Refresh the aim error every so often so the AI feels human (Section 15 step 5).
+        // Cloak heavily degrades the AI's aim — Section 6: "invisible to AI".
+        let cloakedTarget = target.hasBuff(.cloaked)
+        let activeAimRange = cloakedTarget ? aimErrorRange * 4 : aimErrorRange
         secondsUntilAimRefresh -= dt
         if secondsUntilAimRefresh <= 0 {
-            aimError = CGFloat.random(in: -aimErrorRange...aimErrorRange)
+            aimError = CGFloat.random(in: -activeAimRange...activeAimRange)
             secondsUntilAimRefresh = TimeInterval.random(in: 0.4...1.2)
         }
 
@@ -109,8 +114,28 @@ final class AIController {
             && secondaryRoll
         if fireSecondary { secondsSinceSecondaryShot = 0 }
 
+        // Section 15 step 3: AI uses specials "when advantageous". Simple gate: low HP triggers
+        // defensive specials, high aim-quality triggers offensive ones. We don't introspect the
+        // special — we just fire it on a per-frame probability and let the dispatcher decide
+        // whether the special is available (battery, cooldown, target shield, etc.).
+        let specialProb: CGFloat = (lowHealth ? 0.6 : 0.3) * specialFireProbabilityPerSecond
+        let specialRoll = ownShip.specialCooldownRemaining <= 0
+            && allowSpecials
+            && CGFloat.random(in: 0...1) < specialProb * CGFloat(dt)
+        let fireSpecial = specialRoll
+
         return AIDecision(thrust: thrust, brake: brake, turn: turn,
-                          firePrimary: firePrimary, fireSecondary: fireSecondary)
+                          firePrimary: firePrimary, fireSecondary: fireSecondary,
+                          fireSpecial: fireSpecial)
+    }
+
+    private var specialFireProbabilityPerSecond: CGFloat {
+        switch difficulty {
+        case .cadet:     return 0.10
+        case .captain:   return 0.30
+        case .admiral:   return 0.60
+        case .legendary: return 1.20
+        }
     }
 
     // MARK: - Difficulty tuning

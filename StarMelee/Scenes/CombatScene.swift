@@ -28,6 +28,13 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     private var activePowerUps: [PowerUp] = []
     private var planets: [Planet] = []
     private var powerUpManager: PowerUpManager!
+    private var weaponsCatalog: [WeaponDefinition] = []
+
+    // Edge-trigger button state — fires specials on rising-edge only, not while held.
+    private var lastCHandled: Bool = false
+    private var lastABHandled: Bool = false   // Transporter Beam combo
+    private var lastBCHandled: Bool = false   // Cloak combo
+    private var lastACHandled: Bool = false   // Self-Destruct combo
 
     // MARK: - Match management
     private let matchManager = MatchManager()
@@ -156,6 +163,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
 
     private func wireWeapons() {
         let weapons = WeaponDefinition.loadAll()
+        weaponsCatalog = weapons
 
         // Player
         playerPrimary = makeWeapon(weaponID: playerShip.definition.weapons.primary,
@@ -211,6 +219,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         let firing1 = input?.aPressed ?? false
         let firing2 = input?.bPressed ?? false
         let zPressed = input?.zPressed ?? false
+        let cPressed = input?.cPressed ?? false
 
         // Edge-trigger speed boost: only engage on the rising edge of Z so a held button
         // doesn't spam boost attempts every frame.
@@ -218,6 +227,23 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             playerShip.tryEngageSpeedBoost(allowSpecials: allowSpecials)
         }
         lastZHandled = zPressed
+
+        // Edge-trigger C-button: fire player's special. Combos (A+B, B+C, A+C) take precedence
+        // when more than one of those buttons is pressed — they're checked in Iteration K.
+        let abCombo = firing1 && firing2
+        let bcCombo = firing2 && cPressed
+        let acCombo = firing1 && cPressed
+        let plainC = cPressed && !bcCombo && !acCombo
+        if plainC && !lastCHandled {
+            handleSpecialButton(for: playerShip, opponent: enemyShip)
+        }
+        lastCHandled = plainC
+
+        // Stub: these flags drive Iteration J + K combos; we already extract them so the
+        // combo-handler wiring lands in the next file edits without re-reading input again.
+        _ = abCombo
+        _ = bcCombo
+        _ = acCombo
 
         // Phase 1: ships only move/fire when not in series-end. During pre-match we DO allow
         // primary + secondary firing (Section 23 #2) and movement; specials are locked.
@@ -273,6 +299,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         if aiFireSecondary, let shot = enemySecondary.fire(from: enemyShip, target: playerShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
+        }
+        if aiDecision.fireSpecial {
+            handleSpecialButton(for: enemyShip, opponent: playerShip)
         }
 
         // Projectile lifecycle
@@ -602,5 +631,53 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     private func removeProjectile(_ proj: Projectile) {
         proj.removeFromParent()
         activeProjectiles.removeAll { $0 === proj }
+    }
+
+    // MARK: - Special weapon dispatch
+
+    private func handleSpecialButton(for ship: Ship, opponent: Ship) {
+        let result = SpecialWeaponSystem.execute(special: ship,
+                                                 opponent: opponent,
+                                                 allowSpecials: matchManager.allowSpecials,
+                                                 weaponsCatalog: weaponsCatalog)
+        applySpecialResult(result, for: ship, opponent: opponent)
+    }
+
+    private func applySpecialResult(_ result: SpecialWeaponResult, for ship: Ship, opponent: Ship) {
+        switch result {
+        case .fired, .rejected:
+            return
+        case .spawnHomingMissiles(let count):
+            spawnHomingMissileSwarm(from: ship, count: count, target: opponent)
+        case .armedSelfDestruct:
+            // The buff already fires; the blast lands when the buff expires (handled in update).
+            return
+        }
+    }
+
+    private func spawnHomingMissileSwarm(from ship: Ship, count: Int, target: Ship) {
+        guard let missileDef = weaponsCatalog.first(where: { $0.id == "homing_missiles" }) else { return }
+        // Spread the missiles in a small forward arc so they emerge as a swarm.
+        let spread: CGFloat = 0.6   // radians total
+        for i in 0..<count {
+            let t = CGFloat(i) / CGFloat(max(1, count - 1))
+            let angleOffset = -spread / 2 + spread * t
+            let heading = ship.heading + angleOffset
+            let spawnOffset: CGFloat = ship.hitboxRadius + 6
+            let start = CGPoint(
+                x: ship.position.x + cos(heading) * spawnOffset,
+                y: ship.position.y + sin(heading) * spawnOffset
+            )
+            let p = Projectile(
+                definition: missileDef,
+                firedBy: ship.side,
+                startPosition: start,
+                startHeading: heading,
+                homingTarget: target,
+                outgoingMultiplier: ship.outgoingDamageMultiplier
+            )
+            worldNode.addChild(p)
+            activeProjectiles.append(p)
+        }
     }
 }

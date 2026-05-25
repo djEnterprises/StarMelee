@@ -9,6 +9,8 @@ final class Projectile: SKNode {
 
     let definition: WeaponDefinition
     let firedBy: Ship.Side
+    /// Multiplier captured at firing time — reflects the shooter's active outgoing-damage buffs.
+    let outgoingMultiplier: CGFloat
     private var ageSeconds: TimeInterval = 0
     private var velocity: CGVector
     private weak var homingTarget: Ship?
@@ -17,10 +19,12 @@ final class Projectile: SKNode {
          firedBy: Ship.Side,
          startPosition: CGPoint,
          startHeading: CGFloat,
-         homingTarget: Ship? = nil) {
+         homingTarget: Ship? = nil,
+         outgoingMultiplier: CGFloat = 1.0) {
         self.definition = definition
         self.firedBy = firedBy
         self.homingTarget = definition.homing ? homingTarget : nil
+        self.outgoingMultiplier = outgoingMultiplier
 
         let speed = CGFloat(definition.projectileSpeed) * WorldConstants.speedFrameToSecond
         self.velocity = CGVector(dx: cos(startHeading) * speed, dy: sin(startHeading) * speed)
@@ -105,6 +109,6 @@ final class Projectile: SKNode {
 
     /// Compute scaled damage against a target ship's current shield state.
     func computeDamage(against target: Ship) -> CGFloat {
-        PhysicsEngine.damage(weapon: definition, targetShieldFraction: target.shieldFraction)
+        PhysicsEngine.damage(weapon: definition, targetShieldFraction: target.shieldFraction) * outgoingMultiplier
     }
 }

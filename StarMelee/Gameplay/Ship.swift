@@ -48,6 +48,18 @@ final class Ship: SKNode {
     private(set) var speedBoostRemaining: TimeInterval = 0
     private(set) var speedBoostCooldownRemaining: TimeInterval = 0
 
+    /// Time until the C-button special weapon is available again.
+    var specialCooldownRemaining: TimeInterval = 0
+
+    /// Time until the Transporter Beam (A+B combo) can be engaged again.
+    var transporterCooldownRemaining: TimeInterval = 0
+
+    /// Quantum torpedoes in inventory (collected as power-up, used by Transporter Beam).
+    var quantumTorpedoCount: Int = 1
+
+    /// Active effects on this ship.
+    private(set) var activeBuffs: [ShipBuff] = []
+
     /// Speed-boost configuration (Section 5 universal capability — Section 7 battery cost).
     private static let boostDurationSeconds: TimeInterval = 3.0
     private static let boostMultiplier: CGFloat = 3.0
@@ -140,13 +152,19 @@ final class Ship: SKNode {
     func update(dt: TimeInterval, thrust: Bool, brake: Bool, turn: CGFloat, allowSpecials: Bool) {
         let dtf = CGFloat(dt)
 
+        // EM-disrupted ships can't thrust, brake, or turn (Section 6 EM Blast)
+        let disrupted = isEMDisrupted
+        let effectiveThrust = thrust && !disrupted
+        let effectiveBrake = brake && !disrupted
+        let effectiveTurn: CGFloat = disrupted ? 0 : turn
+
         // Turning
-        if abs(turn) > 0.01 {
-            heading += turn * turnRatePerSecond * dtf
+        if abs(effectiveTurn) > 0.01 {
+            heading += effectiveTurn * turnRatePerSecond * dtf
         }
 
         // Thrust
-        if thrust {
+        if effectiveThrust {
             let dx = cos(heading) * accelerationPerSecond * dtf
             let dy = sin(heading) * accelerationPerSecond * dtf
             velocity.dx += dx
@@ -159,14 +177,14 @@ final class Ship: SKNode {
                 velocity.dx *= scale
                 velocity.dy *= scale
             }
-            thrusterFlare.alpha = 1.0
+            thrusterFlare.alpha = hasBuff(.cloaked) ? 0.4 : 1.0
         } else {
             // Fade thruster
             thrusterFlare.alpha = max(0, thrusterFlare.alpha - CGFloat(dt) * 4)
         }
 
         // Brake — fraction of current velocity removed per second.
-        if brake {
+        if effectiveBrake {
             let retention = max(0, 1 - WorldConstants.brakeStrengthPerSecond * dtf)
             velocity.dx *= retention
             velocity.dy *= retention
@@ -196,9 +214,72 @@ final class Ship: SKNode {
         // Speed boost cooldown + active duration tick
         speedBoostCooldownRemaining = max(0, speedBoostCooldownRemaining - dt)
         speedBoostRemaining = max(0, speedBoostRemaining - dt)
+        specialCooldownRemaining = max(0, specialCooldownRemaining - dt)
+        transporterCooldownRemaining = max(0, transporterCooldownRemaining - dt)
+
+        // Tick + apply buffs
+        tickBuffs(dt: dt)
+
+        // Cloaked visual
+        let cloaked = hasBuff(.cloaked)
+        // While cloaked the player still sees a translucent silhouette; the AI's separate
+        // targeting penalty is enforced inside AIController.
+        hull.alpha = cloaked ? 0.35 : 1.0
+
+        // Self-destruct timer expired → trigger blast event (handled by CombatScene observing
+        // `selfDestructTimerExpiredFlag`).
+        if hadSelfDestructLastFrame && !hasBuff(.selfDestructArmed) {
+            selfDestructJustExpired = true
+        }
+        hadSelfDestructLastFrame = hasBuff(.selfDestructArmed)
 
         // allowSpecials is read by the weapon / specials systems; Ship just integrates physics here.
         _ = allowSpecials
+    }
+
+    // MARK: - Buff helpers
+
+    /// Add (or refresh) a buff. If a buff of the same kind exists, its duration is extended
+    /// to the longer of the two and its magnitude is updated to the new value.
+    func applyBuff(_ buff: ShipBuff) {
+        if let i = activeBuffs.firstIndex(where: { $0.kind == buff.kind }) {
+            activeBuffs[i].remainingSeconds = max(activeBuffs[i].remainingSeconds, buff.remainingSeconds)
+        } else {
+            activeBuffs.append(buff)
+        }
+    }
+
+    /// Returns true if a buff of the given kind is currently active.
+    func hasBuff(_ kind: ShipBuff.Kind) -> Bool {
+        activeBuffs.contains { $0.kind == kind && $0.remainingSeconds > 0 }
+    }
+
+    /// Active buff magnitude for the given kind (0 if none).
+    func buffMagnitude(_ kind: ShipBuff.Kind) -> CGFloat {
+        activeBuffs.first { $0.kind == kind && $0.remainingSeconds > 0 }?.magnitude ?? 0
+    }
+
+    /// Remove all buffs (used between matches).
+    func clearBuffs() {
+        activeBuffs.removeAll()
+        hull.alpha = 1.0
+    }
+
+    private var hadSelfDestructLastFrame: Bool = false
+    /// Read-and-cleared by CombatScene to know when to spawn the self-destruct blast.
+    var selfDestructJustExpired: Bool = false
+
+    private func tickBuffs(dt: TimeInterval) {
+        for i in activeBuffs.indices {
+            activeBuffs[i].remainingSeconds -= dt
+        }
+        // Apply repair-drone HP-over-time per second (magnitude is fraction of max HP/s).
+        if hasBuff(.repairDrone) {
+            let mag = buffMagnitude(.repairDrone)
+            adjustHealth(by: mag * maxHealth * CGFloat(dt))
+        }
+        // Drop expired buffs
+        activeBuffs.removeAll { $0.remainingSeconds <= 0 }
     }
 
     /// Attempt to engage Speed Boost (universal capability, Section 5 / Section 7).
@@ -219,9 +300,22 @@ final class Ship: SKNode {
         return true
     }
 
-    /// Effective maximum speed including a 3× scaling while boost is active.
+    /// Effective maximum speed including boost + superSpeed-buff scaling.
     var effectiveMaxSpeed: CGFloat {
-        speedBoostRemaining > 0 ? maxSpeed * Self.boostMultiplier : maxSpeed
+        var s = maxSpeed
+        if speedBoostRemaining > 0 { s *= Self.boostMultiplier }
+        let superMag = buffMagnitude(.superSpeed)
+        if superMag > 1 { s *= superMag }
+        return s
+    }
+
+    /// True while the ship's engines / weapons are EM-disrupted (Prism Hunter's special).
+    var isEMDisrupted: Bool { hasBuff(.emDisrupted) }
+
+    /// Outgoing damage multiplier — from Mimic special / damageMultiplier power-up.
+    var outgoingDamageMultiplier: CGFloat {
+        let m = buffMagnitude(.damageMultiplier)
+        return m > 0 ? m : 1.0
     }
 
     // MARK: - Damage application
@@ -229,9 +323,11 @@ final class Ship: SKNode {
     /// Apply incoming damage. Returns the amount actually subtracted from health.
     /// Section 7: shield absorbs first, then health.
     /// Fun Modifiers: when invincibility is on AND this is the player ship, no damage applies.
+    /// Buffs: `invulnerability` short-circuits damage for any ship (used by Titan Bulwark's special).
     @discardableResult
     func takeDamage(_ amount: CGFloat) -> CGFloat {
         if side == .player && FunModifiers.shared.invincibility { return 0 }
+        if hasBuff(.invulnerability) { return 0 }
         secondsSinceDamage = 0
         var remaining = amount
 
@@ -267,6 +363,14 @@ final class Ship: SKNode {
         shield = maxShield
         battery = maxBattery
         secondsSinceDamage = .infinity
+        speedBoostRemaining = 0
+        speedBoostCooldownRemaining = 0
+        specialCooldownRemaining = 0
+        transporterCooldownRemaining = 0
+        quantumTorpedoCount = 1
+        clearBuffs()
+        hadSelfDestructLastFrame = false
+        selfDestructJustExpired = false
     }
 
     var isDestroyed: Bool { health <= 0 }
