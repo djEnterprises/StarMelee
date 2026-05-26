@@ -37,6 +37,10 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     /// Set true on the frame a Quantum Torpedo kills a ship — drives the FATALITY banner.
     private var lastKillByTorpedo: Bool = false
 
+    /// Set true when the player's self-destruct blast triggers a chain that destroys the enemy
+    /// during the same match — Section 17 selfDestructWins stat.
+    private var playerWonViaSelfDestruct: Bool = false
+
     // Edge-trigger button state — fires specials on rising-edge only, not while held.
     private var lastCHandled: Bool = false
     private var lastABHandled: Bool = false   // Transporter Beam combo
@@ -619,6 +623,24 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         case .matchEnded(let winner, let fatality):
             for p in activeProjectiles { p.removeFromParent() }
             activeProjectiles.removeAll()
+
+            // Section 17: persist this match's result against the player's ship.
+            // Fun Modifiers disable stat recording (per the Section 16.5 "MODIFIERS ACTIVE" rule).
+            if !FunModifiers.shared.anyActive {
+                let playerID = playerShip.definition.id
+                if winner == .player {
+                    LeaderboardStore.shared.recordWin(
+                        shipID: playerID,
+                        byFatality: fatality,
+                        bySelfDestruct: playerWonViaSelfDestruct
+                    )
+                } else {
+                    LeaderboardStore.shared.recordLoss(shipID: playerID)
+                }
+                LeaderboardStore.shared.flushDamage()
+            }
+            playerWonViaSelfDestruct = false   // reset for next match
+
             if winner == .player {
                 HapticsSystem.shared.play(.roundWonByPlayer)
             } else {
@@ -705,6 +727,17 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         }
     }
 
+    /// Section 9: Pause → Quit to Menu counts as a forfeit. Records once against the player's
+    /// current ship if a match is in progress and no Fun Modifier is active.
+    func recordForfeitIfInProgress() {
+        guard !FunModifiers.shared.anyActive else { return }
+        // Only count as a forfeit if a real match is underway.
+        if case .active = matchManager.phase {
+            LeaderboardStore.shared.recordForfeit(shipID: playerShip.definition.id)
+            LeaderboardStore.shared.flushDamage()
+        }
+    }
+
     private func handleSingularityHit(_ debris: SingularityDebris, ship: Ship) {
         ship.takeDamage(SingularityDebris.contactDamage)
         // Brief shake when the player ship makes contact.
@@ -726,6 +759,12 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         if proj.firedBy == target.side { return }
         let damage = proj.computeDamage(against: target)
         target.takeDamage(damage)
+        // Section 17: track damage on the PLAYER's ship only (their leaderboard entry).
+        if proj.firedBy == .player && target.side == .opponent {
+            LeaderboardStore.shared.addDamageDealt(shipID: playerShip.definition.id, amount: Double(damage))
+        } else if proj.firedBy == .opponent && target.side == .player {
+            LeaderboardStore.shared.addDamageTaken(shipID: playerShip.definition.id, amount: Double(damage))
+        }
         removeProjectile(proj)
     }
 
@@ -798,6 +837,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         // Visual + audio + slow-mo (player only)
         juice.spawnSingularityExplosion(at: source.position, in: worldNode)
         juice.slowMo(.shipDestruction)
+        AudioSystem.shared.play(.destruction)
         if source.side == .player { juice.shake(.massive) }
 
         // Radial damage to opponent (and any other ships in future — supports >2 ships)
@@ -812,6 +852,13 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
 
         // Source is always destroyed by their own bomb
         source.takeDamage(source.maxHealth * 2)
+
+        // Section 17 selfDestructWins tracking: if the player blew themselves up AND it killed
+        // the enemy in the same beat, credit the player. (If both die, the match resolves via
+        // MatchManager — the player still gets the SD win flag because they took the AI with them.)
+        if source.side == .player && opponent.isDestroyed {
+            playerWonViaSelfDestruct = true
+        }
     }
 
     // MARK: - Transporter Beam + Quantum Torpedo (Section 6)

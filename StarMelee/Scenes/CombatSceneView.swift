@@ -48,8 +48,8 @@ struct CombatSceneView: View {
                         setPaused(false)
                     },
                     onQuit:    {
-                        // Section 9: Quit is a forfeit. Phase 4 polish will write a
-                        // forfeit record to the leaderboard once that store lands.
+                        // Section 9: Quit is a forfeit. Record before dismissing.
+                        sceneRef?.recordForfeitIfInProgress()
                         dismiss()
                     }
                 )

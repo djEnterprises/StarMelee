@@ -30,9 +30,10 @@ struct MainMenuView: View {
                             .foregroundStyle(Color(.sRGB, red: 1.0, green: 0.67, blue: 0))
                     }
 
-                    VStack(spacing: 16) {
+                    VStack(spacing: 14) {
                         MenuButton(label: "PLAY") { path.append(MenuRoute.shipSelect) }
                         MenuButton(label: "SHIP COMPENDIUM") { path.append(MenuRoute.compendium) }
+                        MenuButton(label: "LEADERBOARD") { path.append(MenuRoute.leaderboard) }
                         MenuButton(label: "SETTINGS") { path.append(MenuRoute.settings) }
                         MenuButton(label: "FUN MODIFIERS") { path.append(MenuRoute.funModifiers) }
                     }
@@ -49,6 +50,7 @@ struct MainMenuView: View {
                 switch route {
                 case .shipSelect: ShipSelectView(path: $path)
                 case .compendium: CompendiumView()
+                case .leaderboard: LeaderboardView()
                 case .settings: SettingsView()
                 case .funModifiers: FunModifiersView()
                 case .combat(let shipID): CombatSceneView(playerShipID: shipID)
@@ -65,6 +67,7 @@ struct MainMenuView: View {
 enum MenuRoute: Hashable {
     case shipSelect
     case compendium
+    case leaderboard
     case settings
     case funModifiers
     case combat(shipID: String)
