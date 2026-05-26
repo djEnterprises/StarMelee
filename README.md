@@ -66,8 +66,8 @@ The plan splits work into five phases:
 1. **Core Combat Prototype** — project skeleton, menu shell, empty arena. ✅ *done*
 2. **Combat Depth** — all 12 ships, weapons, HUD, AI, 2-of-3 match series. ✅ *done*
 3. **Special Mechanics** — Transporter Beam, Quantum Torpedo, Singularity, Cloak, Self-Destruct. ✅ *done*
-4. **Audio + Compendium + Polish** — music, SFX, 3D ship rotator, settings, leaderboard. *(current)*
-5. **IAP + macOS + Submission** — StoreKit 2, Mac Catalyst build, TestFlight, App Store.
+4. **Audio + Compendium + Polish** — procedural SFX, SceneKit 3D Compendium rotator, leaderboard, Game Center wiring, full Core Haptics patterns, shield up/down UX. ✅ *done (curated audio packs pending)*
+5. **IAP + macOS + Submission** — StoreKit 2, TestFlight, App Store. *(current)*
 
 ### SuperGrok additions in place
 
@@ -82,6 +82,17 @@ The SuperGrok 2026-05-25 addendum (`SuperGrok/STAR_MELEE_PLAN.md`) layered in a 
 - **`GameCenterManager`** scaffold — offline-safe stub; ready when ASC is configured.
 - **`InputSource` / `GamepadInputSource`** — PS5 DualSense + Xbox controllers auto-connect and feed the same `InputState` that touch and keyboard use.
 
+### Phase 4 additions in place
+
+- **Procedural audio system** — `AVAudioEngine` pipeline with 18 synthesized one-shots (laser sweeps, explosions, shimmers, victory stings). No file assets required for v1.0 per Section 12; replace with CC0 packs from the source list below in v1.1.
+- **SceneKit 3D Compendium rotator** — `SCNShape`-extruded ship silhouettes with idle auto-rotation, drag-to-orbit, pinch-to-zoom. Faction-tinted emissive materials.
+- **Compendium detail view** — per-ship stats / weapon loadout / strengths / your record (from `LeaderboardStore`).
+- **Leaderboard local store** — per-ship `matchesPlayed / wins / losses / currentStreak / bestStreak / totalDamageDealt / totalDamageTaken / fatalityKills / selfDestructWins / forfeits`. Sorted by win %. Game Center submission paired (offline-safe).
+- **Game Center achievement triggers** — First Blood (first win), On a Roll (5-streak), FATALITY (torpedo kill). Manager no-ops cleanly until you enable Game Center in App Store Connect.
+- **Full CHHapticPattern engine** — multi-pulse rhythms from Section 13's spec ([40,30,40,30,60] etc.) via `CHHapticEngine`, with `UIImpactFeedbackGenerator` fallback for devices without Core Haptics.
+- **Shield up/down UX** — explicit toggle via `SHIELD` HUD button or `R` key. Translucent hemisphere visual; per-ship `shieldUpTime` / `shieldDownTime` honoured. Transporter Beam now requires `shieldsFullyDown` (replacing the 5% proxy).
+- **Quit-to-Menu forfeit recording** — Pause → Quit writes a forfeit row to LeaderboardStore.
+
 ### Phase 3 additions in place
 
 - **All 12 ship special weapons** (C button) — Inertia Dampeners, Super Speed Burst/Long, Invulnerability Shield, EM Blast, Homing Missile swarm (4), Cloaking Device, Cloak+Phase Shift, Mimic, Mimic+Speed, Self-Destruct, Transporter Beam (built-in)
@@ -95,21 +106,23 @@ The SuperGrok 2026-05-25 addendum (`SuperGrok/STAR_MELEE_PLAN.md`) layered in a 
 
 ## Revert / safety
 
-Three safety checkpoints tagged in git:
+Four safety checkpoints tagged in git:
 
 ```bash
-git tag -l                              # phase2-stable, phase2-supergrok, phase3-complete
+git tag -l                              # phase2-stable, phase2-supergrok, phase3-complete, phase4-complete
 git reset --hard phase2-stable          # back to "Aegis playable, AI Captain"
 git reset --hard phase2-supergrok       # back to "+ visual juice, toroidal, Fun Modifiers"
-git reset --hard phase3-complete        # back to current head (Phase 3 done)
+git reset --hard phase3-complete        # back to "+ specials, Transporter Beam + Singularity, Cloak, Self-Destruct"
+git reset --hard phase4-complete        # back to current head (Phase 4 done)
 ```
 
 Per-tag scope:
 - **`phase2-stable`** — Phase 2 only, no SuperGrok additions, bounded-walls world
 - **`phase2-supergrok`** — Phase 2 + visual juice + toroidal wrap + onboarding + Fun Modifiers + VersionCheckManager + GameCenter/Controller scaffolds
-- **`phase3-complete`** — current. All special weapons, Transporter Beam + Quantum Torpedo + Singularity, Cloak, Self-Destruct, full haptic catalog, Pause polish
+- **`phase3-complete`** — Phase 3 done. All special weapons, Transporter Beam + Quantum Torpedo + Singularity, Cloak, Self-Destruct, full haptic catalog, Pause polish
+- **`phase4-complete`** — current. Procedural audio, SceneKit 3D Compendium, leaderboard local store + Game Center submission, full CHHapticPattern engine, shield up/down UX
 
-`git log phase2-supergrok..phase3-complete --oneline` shows the Phase 3 commit chain.
+`git log phase3-complete..phase4-complete --oneline` shows the Phase 4 commit chain.
 
 ### Audio sources (Phase 4 — verified CC0 / commercial-safe)
 
@@ -132,18 +145,18 @@ When the Phase 4 audio pipeline lands, source from these packs only. Never sampl
 
 When any pack requires attribution, add the credit line under Settings → About → Credits.
 
-### Phase 4 hand-off notes
+### Phase 5 hand-off notes — needs your direct input
 
-Phase 3 is done. Phase 4 items remaining per plan Section 19:
+Phases 1–4 are complete. The remaining items all require **decisions or external setup** you have to make personally:
 
-1. **Audio pipeline** — `AudioSystem` is still a thin stub. Phase 4 brings per-ship engine hum, primary/secondary/special weapon SFX, transporter shimmer, FATALITY sting, looping music. Use the CC0 source list above — never sample copyrighted commercial tracks.
-2. **Compendium 3D ship rotator** — Section 11 calls for rotatable low-poly SceneKit models. Today's Compendium shows the polygon silhouette.
-3. **Game Center wiring** — `GameCenterManager` is offline-safe stubbed. Daniel needs to enable Game Center in App Store Connect → Features and create the two leaderboards + five achievements (IDs already declared in code).
-4. **Leaderboard local store** — Section 17 wants per-ship win/loss records persisted via UserDefaults or Core Data. Nothing recorded today.
-5. **AI difficulty tuning** — Cadet / Captain / Admiral / Legendary are all selectable, but only Captain has been playtested.
-6. **Full Core Haptics patterns** — `HapticsSystem` approximates Section 13 timings with dispatched impacts. Phase 4 moves to `CHHapticPattern` JSON files for precise multi-pulse rhythms.
-7. **Forfeit record on Quit** — currently dismisses; Phase 4 leaderboard layer should write a forfeit row.
-8. **Shield up/down UX** — Transporter Beam currently uses a 5%-shield proxy. Phase 4 polish: explicit shield-up/down toggle or animation per Section 7.
+1. **Audio asset selection** — `AudioSystem` ships with procedurally synthesized one-shots (Section 12 explicitly accepts this for v1.0). Whenever you want a step up, pick CC0 tracks/SFX from the source list above (alkakrab itch.io, Kenney.nl, etc.) and the existing API stays the same — only the buffer source changes from generated to file-loaded.
+2. **App Store Connect setup** — Game Center: enable in ASC → Features → create two leaderboards (`com.djEnterprises.starmelee.wins`, `com.djEnterprises.starmelee.win_streak`) and five achievements (`first_blood`, `on_a_roll`, `ship_master`, `untouchable`, `fatality`). IDs are already declared in `GameCenterManager`; submissions wake up the moment ASC is configured.
+3. **Apple App ID for VersionCheck** — After your first App Store publish, set `VersionCheckManager.shared.appleAppID` to the numeric ID from ASC. Until then it's a silent no-op.
+4. **Free vs. paid ship split** — Plan Section 5 recommends 6 free + 6 paid; SuperGrok suggested 8 free + smaller themed packs. Your business call. The Ships.json `tier` field is the toggle.
+5. **AI difficulty tuning** — Captain has been playtested. Cadet, Admiral, and Legendary will feel right after a pass on `aimErrorRange` / `secondaryFireProbabilityPerSecond` / `specialFireProbabilityPerSecond` in `AIController.swift`.
+6. **StoreKit 2 IAP wiring** — Phase 5 spec: ship-pack purchases, weapon-enhancement IAPs. `IAPManager.swift` placeholder file referenced in plan Section 20 hasn't been created yet because the SKUs depend on your final ship-split decision.
+7. **TestFlight beta** — When you're ready, archive + upload via Xcode → ASC.
+8. **App icon (1024×1024) + screenshots + preview video** — All Phase 5 marketing assets.
 
 ## Reference repositories (study only)
 

@@ -46,6 +46,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     private var lastABHandled: Bool = false   // Transporter Beam combo
     private var lastBCHandled: Bool = false   // Cloak combo
     private var lastACHandled: Bool = false   // Self-Destruct combo
+    private var lastShieldToggleHandled: Bool = false
 
     // MARK: - Match management
     private let matchManager = MatchManager()
@@ -270,6 +271,15 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             armSelfDestruct(on: playerShip)
         }
         lastACHandled = acCombo
+
+        // Shield up/down toggle (Section 7 / dedicated HUD button or `R` key).
+        let shieldTogglePressed = input?.shieldTogglePressed ?? false
+        if shieldTogglePressed && !lastShieldToggleHandled {
+            let nowRaised = playerShip.toggleShield()
+            HapticsSystem.shared.play(nowRaised ? .shieldRaise : .shieldBroken)
+            AudioSystem.shared.play(nowRaised ? .shieldRaise : .shieldLower)
+        }
+        lastShieldToggleHandled = shieldTogglePressed
 
         // Phase 1: ships only move/fire when not in series-end. During pre-match we DO allow
         // primary + secondary firing (Section 23 #2) and movement; specials are locked.
@@ -891,10 +901,10 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         guard from.transporterCooldownRemaining <= 0 else { return }
         guard from.quantumTorpedoCount > 0 else { return }
 
-        // Section 6: BOTH shields must be down. We treat <= 5% as "down" so the player doesn't
-        // need an explicit shield-down button (Phase 4 polish DECISION POINT).
-        guard from.shieldFraction <= 0.05 else { return }
-        guard target.shieldFraction <= 0.05 else { return }
+        // Section 6: BOTH ships must have shields fully lowered (transition complete).
+        // Ships with no shield (maxShield == 0) auto-pass this check via shieldsFullyDown.
+        guard from.shieldsFullyDown || from.maxShield == 0 else { return }
+        guard target.shieldsFullyDown || target.maxShield == 0 else { return }
         guard target.plantedTorpedo == nil else { return }   // can't double-stack
 
         // Battery + ammo

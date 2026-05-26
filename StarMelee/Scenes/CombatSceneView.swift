@@ -57,7 +57,7 @@ struct CombatSceneView: View {
             }
 
             VStack {
-                HStack {
+                HStack(spacing: 8) {
                     Button {
                         setPaused(true)
                     } label: {
@@ -72,6 +72,26 @@ struct CombatSceneView: View {
                     }
                     .padding(.top, 8)
                     .padding(.leading, 16)
+
+                    // Shield up/down toggle (Section 7). Tap to flip the player's shield state.
+                    // Edge-detected by the scene so a long press doesn't keep flipping.
+                    Button {
+                        input.shieldTogglePressed = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                            input.shieldTogglePressed = false
+                        }
+                    } label: {
+                        Text("◯ SHIELD")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .tracking(2)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.black.opacity(0.5))
+                            .overlay(Rectangle().stroke(Color(.sRGB, red: 0.4, green: 0.8, blue: 1.0), lineWidth: 1))
+                    }
+                    .padding(.top, 8)
+
                     Spacer()
                     Button {
                         dismiss()
@@ -149,6 +169,14 @@ struct CombatSceneView: View {
         case KeyEquivalent("d"): setStickX(pressed ? 1 : 0, ifMatching: 1)
         case KeyEquivalent("p"): if pressed { setPaused(!gameState.isPaused) }
         case .escape:          if pressed { setPaused(!gameState.isPaused) }
+        case KeyEquivalent("r"):
+            // Shield toggle — edge-detected by the scene, so just pulse the flag.
+            if pressed {
+                input.shieldTogglePressed = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                    input.shieldTogglePressed = false
+                }
+            }
         default:               return .ignored
         }
         return .handled

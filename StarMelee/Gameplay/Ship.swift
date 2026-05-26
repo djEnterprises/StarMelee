@@ -65,6 +65,23 @@ final class Ship: SKNode {
     /// (if in range and ship has_transporter).
     var plantedTorpedo: QuantumTorpedo? = nil
 
+    /// Section 6 / 7 shield up/down state. `true` = shields are raised and protecting the ship;
+    /// `false` = shields lowered (transporter-eligible, no damage absorption from this flag).
+    /// Per-ship transition time controlled by Ships.json `shield_up_time` / `shield_down_time`.
+    private(set) var shieldRaised: Bool = true
+    private(set) var shieldTransitionRemaining: TimeInterval = 0
+
+    /// True when shields are fully lowered (transition complete). Used by the Transporter Beam
+    /// eligibility check in CombatScene.
+    var shieldsFullyDown: Bool {
+        !shieldRaised && shieldTransitionRemaining == 0
+    }
+
+    /// True when shields are fully up (transition complete). Used for damage absorption.
+    var shieldsFullyUp: Bool {
+        shieldRaised && shieldTransitionRemaining == 0
+    }
+
     /// Speed-boost configuration (Section 5 universal capability — Section 7 battery cost).
     private static let boostDurationSeconds: TimeInterval = 3.0
     private static let boostMultiplier: CGFloat = 3.0
@@ -73,6 +90,7 @@ final class Ship: SKNode {
     // MARK: - Visual nodes
     private let hull: SKShapeNode
     private let thrusterFlare: SKShapeNode
+    private let shieldAura: SKShapeNode
 
     // MARK: - Init
 
@@ -120,7 +138,17 @@ final class Ship: SKNode {
         thrusterFlare.glowWidth = 6
         thrusterFlare.alpha = 0
 
+        // Shield aura — translucent hemisphere visible when shields are raised. The fraction
+        // (current shield/maxShield) drives the aura's alpha; toggling lowered fades it out.
+        self.shieldAura = SKShapeNode(circleOfRadius: hitboxRadius * 2.0)
+        shieldAura.fillColor = .clear
+        shieldAura.strokeColor = color.withAlphaComponent(0.6)
+        shieldAura.lineWidth = 2
+        shieldAura.glowWidth = 6
+        shieldAura.alpha = 0   // updated each frame based on shield state + fraction
+
         super.init()
+        addChild(shieldAura)
         addChild(thrusterFlare)
         addChild(hull)
 
@@ -224,6 +252,12 @@ final class Ship: SKNode {
 
         // Tick + apply buffs
         tickBuffs(dt: dt)
+
+        // Shield up/down transition tick + aura visual.
+        if shieldTransitionRemaining > 0 {
+            shieldTransitionRemaining = max(0, shieldTransitionRemaining - dt)
+        }
+        updateShieldAura()
 
         // Cloaked visual
         let cloaked = hasBuff(.cloaked)
@@ -369,6 +403,45 @@ final class Ship: SKNode {
         return healthLoss
     }
 
+    /// Toggle shield up/down. Costs `shieldUpTime` / `shieldDownTime` from the ship definition.
+    /// No-op when already mid-transition. Returns the new target raised state.
+    @discardableResult
+    func toggleShield() -> Bool {
+        guard shieldTransitionRemaining == 0 else { return shieldRaised }
+        // Ships with no shield (Solar Wing, Nova Lancer) can't toggle.
+        guard maxShield > 0 else { return false }
+        shieldRaised.toggle()
+        let transitionSeconds = shieldRaised
+            ? TimeInterval(definition.stats.shieldUpTime)
+            : TimeInterval(definition.stats.shieldDownTime)
+        shieldTransitionRemaining = transitionSeconds
+        return shieldRaised
+    }
+
+    /// Visualize current shield state. Aura alpha tracks shield fraction × raised-ness.
+    /// During transitions the alpha lerps proportionally to remaining time.
+    private func updateShieldAura() {
+        guard maxShield > 0 else {
+            shieldAura.alpha = 0
+            return
+        }
+        let baseFraction = shieldFraction
+        let targetVisibility: CGFloat = shieldRaised ? 1 : 0
+        let visibility: CGFloat
+        if shieldTransitionRemaining > 0 {
+            let totalTime: CGFloat = shieldRaised
+                ? CGFloat(definition.stats.shieldUpTime)
+                : CGFloat(definition.stats.shieldDownTime)
+            let progress = totalTime > 0
+                ? 1 - CGFloat(shieldTransitionRemaining) / totalTime
+                : 1
+            visibility = (1 - progress) * (1 - targetVisibility) + progress * targetVisibility
+        } else {
+            visibility = targetVisibility
+        }
+        shieldAura.alpha = baseFraction * visibility * 0.75
+    }
+
     /// Restore health, shield, and battery to 100% — used between matches (Section 4 step 6).
     func fullyRestore() {
         health = maxHealth
@@ -383,6 +456,8 @@ final class Ship: SKNode {
         clearBuffs()
         hadSelfDestructLastFrame = false
         selfDestructJustExpired = false
+        shieldRaised = true
+        shieldTransitionRemaining = 0
     }
 
     var isDestroyed: Bool { health <= 0 }

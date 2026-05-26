@@ -22,6 +22,9 @@ final class InputState: ObservableObject {
     @Published var yPressed: Bool = false   // brake
     @Published var zPressed: Bool = false   // speed boost
 
+    /// Edge-triggered shield-toggle request (no rate gating — the scene edge-detects).
+    @Published var shieldTogglePressed: Bool = false
+
     // MARK: - Derived helpers
 
     /// Stick magnitude (0...1) after the deadzone is enforced by the source.
