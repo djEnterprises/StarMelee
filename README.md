@@ -28,11 +28,15 @@ original art, and a *Mortal Kombat*-style match structure.
 
 ## Platforms
 
-- **iOS / iPadOS** — primary, touch controls (D-pad + 6 buttons, semi-transparent).
-- **macOS** — via Mac Catalyst, keyboard & mouse (Phase 5).
-- **tvOS** — separate target with controller support (post v1.0).
+| Platform | Status | Scheme | Controls |
+|---|---|---|---|
+| **iOS / iPadOS** | ✅ shipping | `StarMelee` | Touch (PS5-style analog stick + 6-button cluster) + hardware keyboard + PS5/Xbox controllers |
+| **macOS** (via Mac Catalyst) | ✅ shipping | `StarMelee` | Keyboard (WASD + Space/F/G/R/Esc) + mouse + PS5/Xbox controllers |
+| **tvOS** (Apple TV) | ✅ shipping | `StarMeleeTV` | PS5/Xbox controllers + Siri Remote (gamepad-only — touch controls hidden) |
 
-Minimum deployment target: **iOS 17 / iPadOS 17 / macOS 14**.
+Minimum deployment targets: **iOS 17 / iPadOS 17 / macOS 14 / tvOS 17**.
+
+All four platforms share the same `StarMelee/` source folder via Xcode's `PBXFileSystemSynchronizedRootGroup` — no duplicated source tree. Platform-specific behavior (touch UI, haptics, etc.) is gated with `#if !os(tvOS)` / `#if os(iOS)` source guards.
 
 ## Project layout
 
@@ -106,21 +110,23 @@ The SuperGrok 2026-05-25 addendum (`SuperGrok/STAR_MELEE_PLAN.md`) layered in a 
 
 ## Revert / safety
 
-Four safety checkpoints tagged in git:
+Five safety checkpoints tagged in git:
 
 ```bash
-git tag -l                              # phase2-stable, phase2-supergrok, phase3-complete, phase4-complete
+git tag -l                              # phase2-stable, phase2-supergrok, phase3-complete, phase4-complete, phase4-audit
 git reset --hard phase2-stable          # back to "Aegis playable, AI Captain"
 git reset --hard phase2-supergrok       # back to "+ visual juice, toroidal, Fun Modifiers"
 git reset --hard phase3-complete        # back to "+ specials, Transporter Beam + Singularity, Cloak, Self-Destruct"
-git reset --hard phase4-complete        # back to current head (Phase 4 done)
+git reset --hard phase4-complete        # back to Phase 4 done (3 targets)
+git reset --hard phase4-audit           # current — audit pass + tvOS target
 ```
 
 Per-tag scope:
 - **`phase2-stable`** — Phase 2 only, no SuperGrok additions, bounded-walls world
 - **`phase2-supergrok`** — Phase 2 + visual juice + toroidal wrap + onboarding + Fun Modifiers + VersionCheckManager + GameCenter/Controller scaffolds
 - **`phase3-complete`** — Phase 3 done. All special weapons, Transporter Beam + Quantum Torpedo + Singularity, Cloak, Self-Destruct, full haptic catalog, Pause polish
-- **`phase4-complete`** — current. Procedural audio, SceneKit 3D Compendium, leaderboard local store + Game Center submission, full CHHapticPattern engine, shield up/down UX
+- **`phase4-complete`** — Procedural audio, SceneKit 3D Compendium, leaderboard local store + Game Center submission, full CHHapticPattern engine, shield up/down UX
+- **`phase4-audit`** — current. Full hot-path audit: cached UserDefaults reads (~700 reads/sec eliminated), equality-guarded GameState (no more SwiftUI invalidation storms), force-unwrap fixes, timer leak fix, tvOS target added with platform guards, verified iOS / iPad / tvOS / Mac Catalyst all build clean
 
 `git log phase3-complete..phase4-complete --oneline` shows the Phase 4 commit chain.
 
