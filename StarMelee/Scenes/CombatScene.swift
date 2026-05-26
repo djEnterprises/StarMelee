@@ -233,6 +233,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         if zPressed && !lastZHandled {
             if playerShip.tryEngageSpeedBoost(allowSpecials: allowSpecials) {
                 HapticsSystem.shared.play(.speedBoostEngage)
+                AudioSystem.shared.play(.speedBoostEngage)
             }
         }
         lastZHandled = zPressed
@@ -309,19 +310,24 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
             HapticsSystem.shared.play(.primaryFire)
+            AudioSystem.shared.play(.primaryFire)
         }
         if canControlPlayer && firing2, let shot = playerSecondary.fire(from: playerShip, target: enemyShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
             HapticsSystem.shared.play(.secondaryFire)
+            AudioSystem.shared.play(.secondaryFire)
         }
+        // AI weapon fires produce audio (audible in the arena) but never haptics — Section 13.
         if aiFirePrimary, let shot = enemyPrimary.fire(from: enemyShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
+            AudioSystem.shared.play(.primaryFire)
         }
         if aiFireSecondary, let shot = enemySecondary.fire(from: enemyShip, target: playerShip) {
             worldNode.addChild(shot)
             activeProjectiles.append(shot)
+            AudioSystem.shared.play(.secondaryFire)
         }
         if aiDecision.fireSpecial {
             handleSpecialButton(for: enemyShip, opponent: playerShip)
@@ -403,12 +409,15 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             if dropHP > 15 {
                 juice.shake(.heavy)
                 HapticsSystem.shared.play(.damageHeavy)
+                AudioSystem.shared.play(.damageHeavy)
             } else if dropHP > 5 {
                 juice.shake(.medium)
                 HapticsSystem.shared.play(.damageMedium)
+                AudioSystem.shared.play(.damageHeavy)
             } else {
                 juice.shake(.light)
                 HapticsSystem.shared.play(.damageLight)
+                AudioSystem.shared.play(.damageLight)
             }
         }
         lastPlayerHealth = pf
@@ -423,6 +432,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             juice.slowMo(.shipDestruction)
             juice.shake(.heavy)
             HapticsSystem.shared.play(.playerDestroyed)
+            AudioSystem.shared.play(.destruction)
         }
         if !enemyWasDestroyed && enemyShip.isDestroyed {
             enemyWasDestroyed = true
@@ -430,9 +440,8 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
                                             shipColor: SKColor(red: 1.0, green: 0.2, blue: 0.4, alpha: 1),
                                             in: worldNode)
             juice.slowMo(.shipDestruction)
-            // Player-feedback rule: shake on enemy destruction is mild (player just scored a kill,
-            // it's a satisfying moment, but the violence happened to the other ship).
             juice.shake(.medium)
+            AudioSystem.shared.play(.destruction)   // audible to player but no haptic on AI death
         }
 
         // Low-HP smoke trails (Section 14 SuperGrok addition)
@@ -606,8 +615,8 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         switch change {
         case .countdownEnded:
             HapticsSystem.shared.play(.matchStart)
+            AudioSystem.shared.play(.matchStart)
         case .matchEnded(let winner, let fatality):
-            // Active projectiles cleared so next match starts clean.
             for p in activeProjectiles { p.removeFromParent() }
             activeProjectiles.removeAll()
             if winner == .player {
@@ -615,16 +624,22 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             } else {
                 HapticsSystem.shared.play(.roundLostByPlayer)
             }
-            if fatality { HapticsSystem.shared.play(.fatality) }
+            AudioSystem.shared.play(.matchEnd)
+            if fatality {
+                HapticsSystem.shared.play(.fatality)
+                AudioSystem.shared.play(.fatality)
+            }
         case .nextMatchStarted:
-            // Section 4 step 6: ships reset to 100% and respawn.
             resetShipsForNextMatch()
             HapticsSystem.shared.play(.matchStart)
+            AudioSystem.shared.play(.matchStart)
         case .seriesEnded(let winner, _):
             if winner == .player {
                 HapticsSystem.shared.play(.seriesVictory)
+                AudioSystem.shared.play(.victorySting)
             } else {
                 HapticsSystem.shared.play(.seriesDefeat)
+                AudioSystem.shared.play(.defeatSting)
             }
         }
     }
@@ -702,6 +717,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             matchManager.extendActiveTimer(by: extraTime)
         }
         if ship.side == .player { HapticsSystem.shared.play(.powerUpCollected) }
+        AudioSystem.shared.play(.powerUpCollect)
         pu.removeFromParent()
         activePowerUps.removeAll { $0 === pu }
     }
@@ -732,13 +748,16 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         switch result {
         case .fired:
             if ship.side == .player { HapticsSystem.shared.play(.specialFire) }
+            AudioSystem.shared.play(.specialFire)
         case .rejected:
             return
         case .spawnHomingMissiles(let count):
             spawnHomingMissileSwarm(from: ship, count: count, target: opponent)
             if ship.side == .player { HapticsSystem.shared.play(.specialFire) }
+            AudioSystem.shared.play(.specialFire)
         case .armedSelfDestruct:
             if ship.side == .player { HapticsSystem.shared.play(.selfDestructArmed) }
+            AudioSystem.shared.play(.specialFire)
         }
     }
 
@@ -758,6 +777,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         }
         ship.applyBuff(ShipBuff(kind: .cloaked, remainingSeconds: 8, magnitude: 0))
         if ship.side == .player { HapticsSystem.shared.play(.cloakEngage) }
+        AudioSystem.shared.play(.cloakEngage)
     }
 
     // MARK: - Self-Destruct (A+C combo, Section 5)
@@ -850,6 +870,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         // them as the target (Section 13).
         if from.side == .player { HapticsSystem.shared.play(.transporterEngage) }
         if target.side == .player { HapticsSystem.shared.play(.torpedoPlantedOnPlayer) }
+        AudioSystem.shared.play(.transporterEngage)
     }
 
     private func attemptTransportBack(torpedo: QuantumTorpedo, defender: Ship, attacker: Ship) {
@@ -902,6 +923,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         spawnQuantumSingularity(at: host.position)
         juice.spawnSingularityExplosion(at: host.position, in: worldNode)
         juice.slowMo(.quantumSingularity)
+        AudioSystem.shared.play(.quantumSingularity)
         if host.side == .player {
             juice.shake(.massive)
         }

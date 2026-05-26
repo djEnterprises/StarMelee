@@ -7,6 +7,9 @@ struct StarMeleeApp: App {
         // configured in App Store Connect yet — the manager handles that quietly.
         GameCenterManager.shared.authenticate()
 
+        // Procedural audio pipeline (Section 12). Idle until the first play() call.
+        AudioSystem.shared.prepare()
+
         // App Store version check (no-op until Daniel sets the Apple App ID after first publish).
         // VersionCheckManager.shared.appleAppID = "1234567890"
         Task { _ = await VersionCheckManager.shared.checkForUpdate() }
