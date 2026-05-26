@@ -4,18 +4,17 @@ import CoreHaptics
 import UIKit
 #endif
 
-/// Per-event haptic feedback.
+/// Per-event haptic feedback — Section 13 catalog.
 ///
-/// **Plan reference:** Section 13 — full pattern catalog.
+/// Phase 4 upgrade: uses `CHHapticEngine` to play precise multi-pulse `CHHapticPattern`s built
+/// programmatically (the equivalent of the JSON-pattern file mentioned in the plan, just kept
+/// in code so the rhythms are version-controlled with the gameplay code).
+///
+/// Falls back to `UIImpactFeedbackGenerator` on devices without Core Haptics support
+/// (iPads, older iPhones) so every event still produces some tactile feedback.
 ///
 /// **Critical rule (Section 13):** haptics fire **only for events that affect the human
-/// player's ship**. Gameplay code calls `play(.damageMedium)` only when the player took
-/// damage, never when the AI did. This file's API enforces nothing at the framework level —
-/// callers must self-police.
-///
-/// Phase 3 implementation uses `UIImpactFeedbackGenerator` + `UINotificationFeedbackGenerator`
-/// to approximate the patterns described in the plan. Phase 4 polish will move to full
-/// `CHHapticPattern` JSON files in `Resources/Haptics/` for precise multi-pulse timings.
+/// player's ship**. Callers must self-police; this file enforces nothing at the API level.
 final class HapticsSystem {
     static let shared = HapticsSystem()
 
@@ -31,15 +30,15 @@ final class HapticsSystem {
         case selfDestructArmed
 
         // Damage taken by player
-        case damageLight        // < 5 HP
-        case damageMedium       // 5–15 HP
-        case damageHeavy        // > 15 HP
+        case damageLight
+        case damageMedium
+        case damageHeavy
         case shieldBroken
         case shieldRaise
 
         // Player environment
         case crashedIntoPlanet
-        case bouncedOffWall     // Section 4 bounded mode only — toroidal has no walls
+        case bouncedOffWall
 
         // Big events
         case playerDestroyed
@@ -55,17 +54,47 @@ final class HapticsSystem {
         case fatality
     }
 
+    // MARK: - Engine
+
+    #if os(iOS)
+    private var engine: CHHapticEngine?
+    private var supportsHaptics: Bool {
+        CHHapticEngine.capabilitiesForHardware().supportsHaptics
+    }
+    #endif
+
+    private init() {
+        prepareEngine()
+    }
+
+    private func prepareEngine() {
+        #if os(iOS)
+        guard supportsHaptics else { return }
+        do {
+            let e = try CHHapticEngine()
+            // Restart on interruption (incoming call, etc.).
+            e.resetHandler = { [weak self] in
+                try? self?.engine?.start()
+            }
+            e.stoppedHandler = { _ in /* engine stopped — will retry on next play */ }
+            try e.start()
+            engine = e
+        } catch {
+            engine = nil
+        }
+        #endif
+    }
+
+    // MARK: - User-facing settings
+
     var intensitySetting: String {
         UserDefaults.standard.string(forKey: "settings.hapticIntensity") ?? defaultForPlatform
     }
 
-    /// Section 13 defaults: Medium on iPhone, Low on iPad (larger device, less wrist contact),
-    /// Off on macOS (no haptic engine).
     private var defaultForPlatform: String {
         #if os(macOS)
         return "off"
         #else
-        // Treat iPad differently — UIDevice.userInterfaceIdiom == .pad
         #if os(iOS)
         if UIDevice.current.userInterfaceIdiom == .pad { return "low" }
         #endif
@@ -73,76 +102,179 @@ final class HapticsSystem {
         #endif
     }
 
+    private var intensityScale: Float {
+        switch intensitySetting {
+        case "off":    return 0
+        case "low":    return 0.4
+        case "high":   return 1.0
+        default:       return 0.7   // medium
+        }
+    }
+
+    // MARK: - Public play
+
     func play(_ event: Event) {
         #if os(iOS)
-        let setting = intensitySetting
-        guard setting != "off" else { return }
-        let scale: CGFloat = {
-            switch setting {
-            case "low":    return 0.4
-            case "high":   return 1.0
-            default:       return 0.7   // medium
-            }
-        }()
+        let scale = intensityScale
+        guard scale > 0 else { return }
 
-        switch event {
-        // Weapons (player) — light → medium → heavy by weapon weight
-        case .primaryFire, .powerUpCollected, .shieldRaise:
-            UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: scale)
-        case .secondaryFire, .speedBoostEngage, .cloakEngage:
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scale)
-        case .specialFire, .transporterEngage:
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: scale)
-
-        // Damage taken (player) — graded
-        case .damageLight:
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: scale)
-        case .damageMedium, .bouncedOffWall:
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scale)
-        case .damageHeavy, .shieldBroken, .crashedIntoPlanet, .torpedoPlantedOnPlayer:
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: scale)
-
-        // Self-destruct armed: heavy 3-pulse warning ([80, 40, 80, 40, 80] ms — approximated)
-        case .selfDestructArmed:
-            multiPulseHeavy(count: 3, intensity: scale)
-
-        // Player destroyed: sustained intense pattern
-        case .playerDestroyed:
-            multiPulseHeavy(count: 4, intensity: scale)
-
-        // Singularity event: deep continuous rumble (5-pulse heavy)
-        case .singularityEvent:
-            multiPulseHeavy(count: 5, intensity: scale)
-
-        // Match flow
-        case .matchStart:
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        case .roundWonByPlayer, .seriesVictory:
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            multiPulseHeavy(count: 2, intensity: scale * 0.8)
-        case .roundLostByPlayer, .seriesDefeat:
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-
-        // FATALITY — intense 6-pulse + delayed long finale
-        case .fatality:
-            multiPulseHeavy(count: 4, intensity: scale)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: scale)
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        if let engine = engine, supportsHaptics {
+            // Build + play a precise multi-pulse pattern.
+            if let pattern = buildPattern(for: event, scale: scale) {
+                do {
+                    let player = try engine.makePlayer(with: pattern)
+                    try player.start(atTime: 0)
+                    return
+                } catch {
+                    // Engine hiccuped — fall through to generator fallback below.
+                }
             }
         }
+
+        // Fallback: UIImpactFeedbackGenerator for devices without Core Haptics.
+        playFallback(event, scale: CGFloat(scale))
         #endif
     }
 
+    // MARK: - Pattern builder
+
     #if os(iOS)
-    /// Approximate the multi-pulse patterns from Section 13 with timed heavy impacts.
-    private func multiPulseHeavy(count: Int, intensity: CGFloat) {
-        for i in 0..<count {
-            let delay = Double(i) * 0.08
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: intensity)
+
+    /// Build the Section 13 pattern for an event. Each pulse-duration array becomes a sequence
+    /// of continuous haptic events with a small 10ms gap between pulses for distinct rhythm.
+    private func buildPattern(for event: Event, scale: Float) -> CHHapticPattern? {
+        let intensity = scale
+        switch event {
+
+        // Simple transient pulses (single tick).
+        case .primaryFire:
+            return makePattern([(0.010, intensity, 0.8)])
+        case .secondaryFire:
+            return makePattern([(0.025, intensity, 0.6)])
+        case .specialFire:
+            return makePattern([(0.060, intensity, 0.5)])
+        case .damageLight:
+            return makePattern([(0.012, intensity * 0.7, 0.5)])
+        case .damageMedium:
+            return makePattern([(0.028, intensity, 0.7)])
+        case .shieldRaise:
+            return makePattern([(0.020, intensity * 0.6, 0.3)])
+        case .bouncedOffWall:
+            return makePattern([(0.018, intensity * 0.5, 0.4)])
+        case .roundLostByPlayer:
+            return makePattern([(0.120, intensity, 0.4)])
+
+        // Multi-pulse rhythms from Section 13.
+        case .transporterEngage:
+            return makePulses(durationsMs: [40, 30, 40, 30, 60], intensity: intensity, sharpness: 0.7)
+        case .torpedoPlantedOnPlayer:
+            return makePulses(durationsMs: [60, 40, 80], intensity: intensity, sharpness: 0.7)
+        case .speedBoostEngage:
+            return makePulses(durationsMs: [25, 15, 25], intensity: intensity, sharpness: 0.7)
+        case .cloakEngage:
+            return makePulses(durationsMs: [15, 50, 15], intensity: intensity * 0.7, sharpness: 0.3)
+        case .selfDestructArmed:
+            return makePulses(durationsMs: [80, 40, 80, 40, 80], intensity: intensity, sharpness: 0.9)
+        case .damageHeavy:
+            return makePulses(durationsMs: [40, 25, 60], intensity: intensity, sharpness: 0.8)
+        case .shieldBroken:
+            return makePulses(durationsMs: [25, 25, 25], intensity: intensity, sharpness: 0.9)
+        case .crashedIntoPlanet:
+            return makePulses(durationsMs: [40, 20, 50], intensity: intensity, sharpness: 0.7)
+        case .singularityEvent:
+            return makePulses(durationsMs: [200, 60, 150, 60, 200], intensity: intensity, sharpness: 0.4)
+        case .powerUpCollected:
+            return makePulses(durationsMs: [10, 20, 15], intensity: intensity * 0.8, sharpness: 0.7)
+        case .matchStart:
+            return makePulses(durationsMs: [25, 80, 25], intensity: intensity, sharpness: 0.7)
+        case .roundWonByPlayer:
+            return makePulses(durationsMs: [60, 40, 100], intensity: intensity, sharpness: 0.6)
+        case .playerDestroyed:
+            return makePulses(durationsMs: [70, 50, 60, 50, 90, 60, 200], intensity: intensity, sharpness: 0.5)
+        case .seriesVictory:
+            return makePulses(durationsMs: [80, 50, 80, 50, 200], intensity: intensity, sharpness: 0.7)
+        case .seriesDefeat:
+            return makePulses(durationsMs: [180, 100, 180], intensity: intensity * 0.8, sharpness: 0.3)
+        case .fatality:
+            // Six-pulse build + long finale, 100ms gap then sustained 350ms (Section 13).
+            return makePulses(durationsMs: [50, 30, 50, 30, 50, 30, 350],
+                              intensity: intensity, sharpness: 0.8,
+                              gapMs: 10, finaleSustain: true)
+        }
+    }
+
+    /// Build a pattern from a list of (duration_seconds, intensity, sharpness) tuples — used
+    /// for the single-pulse events above. Each event starts immediately after the previous.
+    private func makePattern(_ pulses: [(Double, Float, Float)]) -> CHHapticPattern? {
+        var events: [CHHapticEvent] = []
+        var t: TimeInterval = 0
+        for (dur, intensity, sharpness) in pulses {
+            let params = [
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity),
+                CHHapticEventParameter(parameterID: .hapticSharpness, value: sharpness),
+            ]
+            events.append(CHHapticEvent(eventType: .hapticContinuous,
+                                        parameters: params,
+                                        relativeTime: t,
+                                        duration: dur))
+            t += dur + 0.010   // tiny gap
+        }
+        return try? CHHapticPattern(events: events, parameters: [])
+    }
+
+    /// Build a multi-pulse pattern from a list of pulse durations (in milliseconds), separated
+    /// by a fixed gap. All pulses share the same intensity + sharpness. Optional `finaleSustain`
+    /// makes the last pulse a louder sustained note (used for FATALITY).
+    private func makePulses(durationsMs: [Int],
+                            intensity: Float,
+                            sharpness: Float,
+                            gapMs: Int = 10,
+                            finaleSustain: Bool = false) -> CHHapticPattern? {
+        var events: [CHHapticEvent] = []
+        var t: TimeInterval = 0
+        for (i, ms) in durationsMs.enumerated() {
+            let dur = TimeInterval(ms) / 1000.0
+            let isFinale = finaleSustain && (i == durationsMs.count - 1)
+            let pulseIntensity = isFinale ? min(1.0, intensity * 1.2) : intensity
+            let pulseSharpness = isFinale ? max(0.1, sharpness * 0.6) : sharpness
+            let params = [
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: pulseIntensity),
+                CHHapticEventParameter(parameterID: .hapticSharpness, value: pulseSharpness),
+            ]
+            events.append(CHHapticEvent(eventType: .hapticContinuous,
+                                        parameters: params,
+                                        relativeTime: t,
+                                        duration: dur))
+            t += dur + TimeInterval(gapMs) / 1000.0
+        }
+        return try? CHHapticPattern(events: events, parameters: [])
+    }
+
+    // MARK: - Fallback (no Core Haptics)
+
+    private func playFallback(_ event: Event, scale: CGFloat) {
+        switch event {
+        case .primaryFire, .powerUpCollected, .shieldRaise, .bouncedOffWall:
+            UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: scale)
+        case .secondaryFire, .speedBoostEngage, .cloakEngage, .damageMedium:
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: scale)
+        case .specialFire, .transporterEngage, .damageHeavy, .shieldBroken,
+             .crashedIntoPlanet, .torpedoPlantedOnPlayer, .selfDestructArmed,
+             .playerDestroyed, .singularityEvent:
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: scale)
+        case .damageLight:
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: scale)
+        case .matchStart, .roundWonByPlayer, .seriesVictory:
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case .roundLostByPlayer, .seriesDefeat:
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        case .fatality:
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: scale)
             }
         }
     }
+
     #endif
 }
