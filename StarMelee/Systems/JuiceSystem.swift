@@ -174,6 +174,40 @@ final class JuiceSystem {
         }
     }
 
+    // MARK: - Red-vignette flash on player damage
+
+    /// Spawn a brief red screen-edge vignette on the camera. The vignette is a static-
+    /// position SKShapeNode child of the camera (so it always covers the screen regardless
+    /// of camera position), faded in and out. Strength scales the peak alpha + duration.
+    ///
+    /// Used for: player taking damage. Gives an instantly recognizable "you got hit" signal
+    /// even when the actual damage flash on the ship hull is occluded by HUD overlays.
+    func flashRedVignette(strength: CGFloat, in camera: SKCameraNode) {
+        let scale = motionScale
+        guard scale > 0 else { return }
+        let peakAlpha: CGFloat = min(0.55, 0.20 + strength * 0.4) * scale
+
+        // Build a large rounded-rect "frame" — colored ring around the screen edges so the
+        // center stays clearly visible. Sized to comfortably cover any iOS/iPad/tvOS/Mac
+        // viewport without needing to know the actual SKView size.
+        let frame = SKShapeNode(rectOf: CGSize(width: 4000, height: 4000), cornerRadius: 24)
+        frame.lineWidth = 220
+        frame.strokeColor = SKColor(red: 1.0, green: 0.15, blue: 0.20, alpha: peakAlpha)
+        frame.fillColor = .clear
+        frame.glowWidth = 60
+        frame.alpha = 0
+        frame.zPosition = 999       // above all gameplay nodes
+        frame.position = .zero       // centered on camera
+        camera.addChild(frame)
+
+        let fadeIn = SKAction.fadeAlpha(to: 1.0, duration: 0.05)
+        let hold = SKAction.wait(forDuration: 0.08)
+        let fadeOut = SKAction.fadeAlpha(to: 0.0, duration: 0.30 + Double(strength) * 0.15)
+        frame.run(SKAction.sequence([fadeIn, hold, fadeOut])) { [weak frame] in
+            frame?.removeFromParent()
+        }
+    }
+
     // MARK: - Reduce Motion gate
 
     /// 0.0 = effects fully disabled; 1.0 = effects at full strength.

@@ -35,10 +35,22 @@ final class Ship: SKNode {
     /// Module-internal setter so `PhysicsEngine` can write after a wall reflection.
     var velocity: CGVector = .zero
 
-    /// Heading in radians (0 = facing right / +x axis).
+    /// Heading in radians (0 = facing right / +x axis), math convention.
+    ///
+    /// The hull is drawn with its nose at (0, +1) — i.e. pointing **up** at `zRotation = 0`.
+    /// To make heading-math line up with the visual:
+    ///   heading=0 (math right) → rotate hull CW 90° → zRotation = -π/2
+    ///   heading=π/2 (math up)  → no rotation        → zRotation = 0
+    ///   heading=π   (math left) → rotate hull CCW 90°→ zRotation = π/2
+    /// Hence `zRotation = heading - π/2` and its inverse `heading = zRotation + π/2`.
+    ///
+    /// Audit fix: the previous formula `zRotation = π/2 - heading` was a mirror-inversion —
+    /// the ship visually faced the *opposite* of its heading, so projectiles (which use
+    /// `cos(heading) / sin(heading)` for spawn position) appeared to emerge from the rear.
+    /// `Projectile.zRotation` already used the correct formula; only Ship was wrong.
     var heading: CGFloat {
-        get { -zRotation + .pi / 2 }   // SpriteKit's zRotation has 0 = facing +x via image orientation
-        set { zRotation = .pi / 2 - newValue }
+        get { zRotation + .pi / 2 }
+        set { zRotation = newValue - .pi / 2 }
     }
 
     /// Seconds since this ship last took damage. Used to gate self-heal (Section 7: pauses for 2s after damage).
@@ -91,6 +103,9 @@ final class Ship: SKNode {
     private let hull: SKShapeNode
     private let thrusterFlare: SKShapeNode
     private let shieldAura: SKShapeNode
+    /// Bright dot at the hull's nose tip — UX cue so the player can always see which way
+    /// the ship is pointing (especially when idle, without a thruster flare).
+    private let noseIndicator: SKShapeNode
 
     // MARK: - Init
 
@@ -147,10 +162,22 @@ final class Ship: SKNode {
         shieldAura.glowWidth = 6
         shieldAura.alpha = 0   // updated each frame based on shield state + fraction
 
+        // Nose indicator — small bright dot at the hull's tip so the player can read
+        // orientation at a glance. Drawn in local space at (0, s2) which is the same
+        // point the hull silhouette uses for its nose vertex.
+        self.noseIndicator = SKShapeNode(circleOfRadius: 2.5)
+        noseIndicator.position = CGPoint(x: 0, y: s2)
+        noseIndicator.fillColor = .white
+        noseIndicator.strokeColor = color
+        noseIndicator.lineWidth = 1
+        noseIndicator.glowWidth = 6
+        noseIndicator.zPosition = 1   // above hull
+
         super.init()
         addChild(shieldAura)
         addChild(thrusterFlare)
         addChild(hull)
+        addChild(noseIndicator)
 
         // SpriteKit physics — circular hitbox for ship-vs-projectile collision.
         let body = SKPhysicsBody(circleOfRadius: hitboxRadius)
@@ -384,19 +411,47 @@ final class Ship: SKNode {
         let healthLoss = max(0, remaining)
         health = max(0, health - healthLoss)
 
-        // Damage flash
+        // Damage flash — Audit fix: previous flash was only 60ms white. Boosted to a two-stage
+        // flash (white → bright damage-red → fade) so even small hits register visually.
+        // The hull also briefly fattens its stroke + glow so silhouette pops on dark space.
+        let originalFill = hull.fillColor
+        let originalLineWidth = hull.lineWidth
+        let originalGlow = hull.glowWidth
+        let damageRed = SKColor(red: 1.0, green: 0.25, blue: 0.25, alpha: 1.0)
+
         let flash = SKAction.sequence([
-            SKAction.run { [weak self] in self?.hull.fillColor = .white },
+            SKAction.run { [weak self] in
+                self?.hull.fillColor = .white
+                self?.hull.strokeColor = .white
+                self?.hull.lineWidth = originalLineWidth * 1.8
+                self?.hull.glowWidth = originalGlow + 4
+            },
             SKAction.wait(forDuration: 0.06),
+            SKAction.run { [weak self] in
+                self?.hull.fillColor = damageRed.withAlphaComponent(0.6)
+                self?.hull.strokeColor = damageRed
+            },
+            SKAction.wait(forDuration: 0.10),
             SKAction.run { [weak self] in
                 guard let self else { return }
                 let color: SKColor = self.side == .player
-                    ? SKColor(red: 0, green: 1.0, blue: 0.84, alpha: 0.18)
-                    : SKColor(red: 1.0, green: 0.2, blue: 0.4, alpha: 0.18)
-                self.hull.fillColor = color
+                    ? SKColor(red: 0, green: 1.0, blue: 0.84, alpha: 1.0)
+                    : SKColor(red: 1.0, green: 0.2, blue: 0.4, alpha: 1.0)
+                self.hull.fillColor = originalFill
+                self.hull.strokeColor = color
+                self.hull.lineWidth = originalLineWidth
+                self.hull.glowWidth = originalGlow
             }
         ])
         hull.run(flash, withKey: "damageFlash")
+
+        // Brief scale pulse — physical "punch" feel. SKAction sequencing on the parent
+        // (self, not hull) so the whole ship reacts, not just the silhouette.
+        let punch = SKAction.sequence([
+            SKAction.scale(to: 1.10, duration: 0.04),
+            SKAction.scale(to: 1.00, duration: 0.10)
+        ])
+        run(punch, withKey: "damagePunch")
 
         return healthLoss
     }

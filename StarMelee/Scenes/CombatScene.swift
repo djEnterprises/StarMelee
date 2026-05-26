@@ -433,25 +433,31 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         followTarget = clampToCameraBounds(followTarget)
         juice.apply(dt: rawDt, to: cameraNode, cameraTargetPosition: followTarget)
 
-        // Damage detection — shake + haptics on rising-edge health drops for the PLAYER only.
-        // Section 13 critical rule: never haptic for AI-side events.
+        // Damage detection — shake + haptics + screen vignette on rising-edge health drops
+        // for the PLAYER only. Section 13 critical rule: never haptic for AI-side events.
+        // Audit fix: shake tiers bumped one notch — even small primary-fire hits now produce
+        // visibly perceptible feedback (was light → medium → heavy, now medium → heavy → massive).
         let pf = playerShip.healthFraction
         if pf < lastPlayerHealth {
             let drop = lastPlayerHealth - pf
             let dropHP = drop * playerShip.maxHealth
             if dropHP > 15 {
-                juice.shake(.heavy)
+                juice.shake(.massive)
                 HapticsSystem.shared.play(.damageHeavy)
                 AudioSystem.shared.play(.damageHeavy)
             } else if dropHP > 5 {
-                juice.shake(.medium)
+                juice.shake(.heavy)
                 HapticsSystem.shared.play(.damageMedium)
                 AudioSystem.shared.play(.damageHeavy)
             } else {
-                juice.shake(.light)
+                juice.shake(.medium)
                 HapticsSystem.shared.play(.damageLight)
                 AudioSystem.shared.play(.damageLight)
             }
+            // Universal red-vignette pulse on player damage — easy peripheral signal that you
+            // were hit. Strength scales with damage so big hits look big.
+            let vignetteStrength = min(1.0, dropHP / 20.0)
+            juice.flashRedVignette(strength: vignetteStrength, in: cameraNode)
         }
         lastPlayerHealth = pf
         lastEnemyHealth = enemyShip.healthFraction
