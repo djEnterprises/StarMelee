@@ -190,7 +190,9 @@ struct CompendiumDetailView: View {
             .padding(.vertical, 16)
         }
         .background(Color.black.ignoresSafeArea())
+        #if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 
     private func sectionTitle(_ text: String) -> some View {

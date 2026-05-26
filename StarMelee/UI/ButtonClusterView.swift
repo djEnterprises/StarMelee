@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if !os(tvOS)
+// tvOS has no touchscreen + no DragGesture; on Apple TV input comes from GamepadInputSource.
+// This whole file is excluded from tvOS compilation.
+
 /// Bottom-right 6-button cluster: top row X / Y / Z, bottom row A / B / C.
 ///
 /// **Plan reference:** Section 9 (Sega Genesis / 8BitDo M30 layout).
@@ -66,3 +70,5 @@ private struct ControlButton: View {
         .padding()
         .background(Color.black)
 }
+
+#endif  // !os(tvOS)

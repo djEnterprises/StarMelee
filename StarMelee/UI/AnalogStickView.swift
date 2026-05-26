@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if !os(tvOS)
+// tvOS has no touchscreen + no DragGesture; on Apple TV input comes from GamepadInputSource.
+// This whole file is excluded from tvOS compilation.
+
 /// PS5-style analog joystick.
 ///
 /// **Plan reference:** Section 9 — circular base ~140 pt, inner stick ~64 pt, deadzone 0.18.
@@ -109,3 +113,5 @@ struct AnalogStickView: View {
         .padding()
         .background(Color.black)
 }
+
+#endif  // !os(tvOS)

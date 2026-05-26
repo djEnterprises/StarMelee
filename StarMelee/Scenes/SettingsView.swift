@@ -71,7 +71,18 @@ struct SettingsView: View {
         .navigationTitle("Settings")
     }
 
+    /// tvOS doesn't ship `Slider` or `Stepper`. We fall back to a Picker with 11 discrete
+    /// 10%-step values so settings stay adjustable via Apple TV remote / Siri Remote / gamepad.
+    @ViewBuilder
     private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double> = 0...1) -> some View {
+        #if os(tvOS)
+        let buckets: [Double] = (0...10).map { range.lowerBound + Double($0) / 10 * (range.upperBound - range.lowerBound) }
+        Picker(label, selection: value) {
+            ForEach(buckets, id: \.self) { v in
+                Text(String(format: "%.0f%%", v * 100)).tag(v)
+            }
+        }
+        #else
         HStack {
             Text(label)
             Slider(value: value, in: range)
@@ -80,6 +91,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 48, alignment: .trailing)
         }
+        #endif
     }
 
     private var appVersion: String {
