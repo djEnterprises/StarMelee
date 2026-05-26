@@ -110,9 +110,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
 
         powerUpManager = PowerUpManager(definitions: PowerUpDefinition.loadAll())
 
-        // One-time minimap data
+        // One-time minimap data — captured once at scene build, never changes during a match.
         gameState?.worldRect = worldRect
-        gameState?.planetMarkers = planets.map { ($0.position, $0.radius) }
+        gameState?.planetMarkers = planets.map { PlanetMarker(position: $0.position, radius: $0.radius) }
 
         cameraNode.position = playerShip.position
         publishGameState()
@@ -177,26 +177,36 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         let weapons = WeaponDefinition.loadAll()
         weaponsCatalog = weapons
 
-        // Player
+        // Audit fix: replaced force-unwraps with a safe-fallback weapon so a missing JSON entry
+        // can't crash the app in production. Falls back to "laser_cannon" if the lookup fails.
         playerPrimary = makeWeapon(weaponID: playerShip.definition.weapons.primary,
                                    fireRateFrames: playerShip.definition.stats.primaryFireRateFrames,
-                                   in: weapons)!
+                                   in: weapons)
+            ?? safeWeaponFallback(in: weapons, fireRateFrames: playerShip.definition.stats.primaryFireRateFrames)
         playerSecondary = makeWeapon(weaponID: playerShip.definition.weapons.secondary,
                                      fireRateFrames: playerShip.definition.stats.secondaryFireRateFrames,
-                                     in: weapons)!
-
-        // Enemy
+                                     in: weapons)
+            ?? safeWeaponFallback(in: weapons, fireRateFrames: playerShip.definition.stats.secondaryFireRateFrames)
         enemyPrimary = makeWeapon(weaponID: enemyShip.definition.weapons.primary,
                                   fireRateFrames: enemyShip.definition.stats.primaryFireRateFrames,
-                                  in: weapons)!
+                                  in: weapons)
+            ?? safeWeaponFallback(in: weapons, fireRateFrames: enemyShip.definition.stats.primaryFireRateFrames)
         enemySecondary = makeWeapon(weaponID: enemyShip.definition.weapons.secondary,
                                     fireRateFrames: enemyShip.definition.stats.secondaryFireRateFrames,
-                                    in: weapons)!
+                                    in: weapons)
+            ?? safeWeaponFallback(in: weapons, fireRateFrames: enemyShip.definition.stats.secondaryFireRateFrames)
 
-        // AI difficulty from settings, defaulting to Captain (Section 15 default).
         let savedDifficulty = UserDefaults.standard.string(forKey: "settings.aiDifficulty") ?? "captain"
         let diff = AIController.Difficulty(rawValue: savedDifficulty) ?? .captain
         aiController = AIController(difficulty: diff)
+    }
+
+    /// Last-resort fallback weapon — used if a ship's `weapons.json` ID lookup fails so the
+    /// game still launches instead of crashing on a force-unwrap. Picks "laser_cannon" if it
+    /// exists in the catalog (it does in stock Weapons.json), otherwise the first entry.
+    private func safeWeaponFallback(in weapons: [WeaponDefinition], fireRateFrames: Int) -> Weapon {
+        let def = weapons.first { $0.id == "laser_cannon" } ?? weapons[0]
+        return Weapon(definition: def, fireRateFrames: fireRateFrames)
     }
 
     private func makeWeapon(weaponID: String, fireRateFrames: Int, in weapons: [WeaponDefinition]) -> Weapon? {
@@ -300,10 +310,19 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
                                              target: playerShip,
                                              allowSpecials: allowSpecials,
                                              world: worldRect)
-        let aiCadenceCutPrimary: CGFloat = matchManager.allowSpecials ? 1.0 : 0.6
-        let aiCadenceCutSecondary: CGFloat = matchManager.allowSpecials ? 1.0 : 0.2
-        let aiFirePrimary = aiDecision.firePrimary && CGFloat.random(in: 0...1) < aiCadenceCutPrimary
-        let aiFireSecondary = aiDecision.fireSecondary && CGFloat.random(in: 0...1) < aiCadenceCutSecondary
+        // Audit fix: when cadence cut is 1.0 (full match) we don't need a random roll at all.
+        // This skips ~120 random-number generations per second during active match.
+        let allowFullCadence = matchManager.allowSpecials
+        let aiFirePrimary: Bool = {
+            guard aiDecision.firePrimary else { return false }
+            if allowFullCadence { return true }
+            return CGFloat.random(in: 0...1) < 0.6
+        }()
+        let aiFireSecondary: Bool = {
+            guard aiDecision.fireSecondary else { return false }
+            if allowFullCadence { return true }
+            return CGFloat.random(in: 0...1) < 0.2
+        }()
 
         enemyShip.update(dt: dt,
                          thrust: aiDecision.thrust,
@@ -932,9 +951,10 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
 
     private func attemptTransportBack(torpedo: QuantumTorpedo, defender: Ship, attacker: Ship) {
         guard defender.definition.weapons.hasTransporter else { return }
-        // Section 6: only works within 25% of arena range.
-        let dist = hypot(PhysicsEngine.shortestDelta(from: defender.position, to: attacker.position, world: worldRect).dx,
-                         PhysicsEngine.shortestDelta(from: defender.position, to: attacker.position, world: worldRect).dy)
+        // Section 6: only works within 25% of arena range. (Audit fix: previously called
+        // shortestDelta twice; now compute the delta once.)
+        let delta = PhysicsEngine.shortestDelta(from: defender.position, to: attacker.position, world: worldRect)
+        let dist = hypot(delta.dx, delta.dy)
         let maxRange = min(worldRect.width, worldRect.height) * Self.transportBackRangeFraction
         guard dist <= maxRange else { return }
 

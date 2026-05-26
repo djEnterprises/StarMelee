@@ -28,9 +28,9 @@ struct MinimapView: View {
             ctx.fill(bg, with: .color(.black.opacity(0.55)))
 
             // Planets
-            for (pos, radius) in gameState.planetMarkers {
-                let mp = mapToMinimap(pos, world: world, mapSize: size)
-                let r = mapScale(radius, world: world, mapSize: size).clamped(min: 1.5, max: 6)
+            for marker in gameState.planetMarkers {
+                let mp = mapToMinimap(marker.position, world: world, mapSize: size)
+                let r = mapScale(marker.radius, world: world, mapSize: size).clamped(min: 1.5, max: 6)
                 let rect = CGRect(x: mp.x - r, y: mp.y - r, width: r*2, height: r*2)
                 ctx.fill(Path(ellipseIn: rect), with: .color(.white.opacity(0.35)))
             }
@@ -90,9 +90,9 @@ private extension CGFloat {
     gs.playerWorldPos = CGPoint(x: 0, y: 0)
     gs.enemyWorldPos = CGPoint(x: 800, y: 500)
     gs.planetMarkers = [
-        (CGPoint(x: -1000, y: 700), 50),
-        (CGPoint(x: 1500, y: -1200), 80),
-        (CGPoint(x: 200, y: -2000), 40),
+        PlanetMarker(position: CGPoint(x: -1000, y: 700), radius: 50),
+        PlanetMarker(position: CGPoint(x: 1500, y: -1200), radius: 80),
+        PlanetMarker(position: CGPoint(x: 200, y: -2000), radius: 40),
     ]
     return MinimapView(gameState: gs)
         .padding()

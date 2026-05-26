@@ -65,6 +65,40 @@ final class HapticsSystem {
 
     private init() {
         prepareEngine()
+        refreshIntensityCache()
+        // Settings changes (e.g. user toggling Haptic Intensity) update the cache cheaply
+        // via the global UserDefaults notification — no per-frame reads.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDefaultsChanged),
+            name: UserDefaults.didChangeNotification,
+            object: nil
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    /// Cached intensity scale — refreshed on UserDefaults changes. 0 = haptics disabled.
+    private var cachedIntensityScale: Float = 0.7
+
+    /// Refresh the cached intensity (called at init and from UserDefaults observer).
+    /// Public so the Settings screen can explicitly nudge it on dismiss if needed.
+    func refreshIntensityCache() {
+        let setting = UserDefaults.standard.string(forKey: "settings.hapticIntensity") ?? defaultForPlatform
+        cachedIntensityScale = {
+            switch setting {
+            case "off":  return 0
+            case "low":  return 0.4
+            case "high": return 1.0
+            default:     return 0.7
+            }
+        }()
+    }
+
+    @objc private func handleDefaultsChanged() {
+        refreshIntensityCache()
     }
 
     private func prepareEngine() {
@@ -102,20 +136,14 @@ final class HapticsSystem {
         #endif
     }
 
-    private var intensityScale: Float {
-        switch intensitySetting {
-        case "off":    return 0
-        case "low":    return 0.4
-        case "high":   return 1.0
-        default:       return 0.7   // medium
-        }
-    }
+    /// Read-only accessor kept for any external code that wants the current scale.
+    var intensityScale: Float { cachedIntensityScale }
 
     // MARK: - Public play
 
     func play(_ event: Event) {
         #if os(iOS)
-        let scale = intensityScale
+        let scale = cachedIntensityScale
         guard scale > 0 else { return }
 
         if let engine = engine, supportsHaptics {

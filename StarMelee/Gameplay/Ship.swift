@@ -185,7 +185,8 @@ final class Ship: SKNode {
     func update(dt: TimeInterval, thrust: Bool, brake: Bool, turn: CGFloat, allowSpecials: Bool) {
         let dtf = CGFloat(dt)
 
-        // EM-disrupted ships can't thrust, brake, or turn (Section 6 EM Blast)
+        // Cache buff lookups once per frame — used multiple times below.
+        let cloaked = hasBuff(.cloaked)
         let disrupted = isEMDisrupted
         let effectiveThrust = thrust && !disrupted
         let effectiveBrake = brake && !disrupted
@@ -210,7 +211,7 @@ final class Ship: SKNode {
                 velocity.dx *= scale
                 velocity.dy *= scale
             }
-            thrusterFlare.alpha = hasBuff(.cloaked) ? 0.4 : 1.0
+            thrusterFlare.alpha = cloaked ? 0.4 : 1.0
         } else {
             // Fade thruster
             thrusterFlare.alpha = max(0, thrusterFlare.alpha - CGFloat(dt) * 4)
@@ -259,10 +260,7 @@ final class Ship: SKNode {
         }
         updateShieldAura()
 
-        // Cloaked visual
-        let cloaked = hasBuff(.cloaked)
-        // While cloaked the player still sees a translucent silhouette; the AI's separate
-        // targeting penalty is enforced inside AIController.
+        // Cloaked visual — cached cloak boolean from top of update (no second lookup).
         hull.alpha = cloaked ? 0.35 : 1.0
 
         // Self-destruct timer expired → trigger blast event (handled by CombatScene observing

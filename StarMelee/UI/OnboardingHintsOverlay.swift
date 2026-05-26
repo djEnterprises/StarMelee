@@ -7,6 +7,10 @@ import Combine
 /// Each hint fades as soon as the player uses the matching input. A safety timeout fades
 /// any remaining hints after 8 seconds so the overlay never overstays its welcome.
 /// Persists "seen" via UserDefaults so it never appears again on subsequent matches.
+///
+/// Audit fix: the previous version kept a `Timer.publish.autoconnect()` running for the
+/// view's lifetime even after dismissal. The cancellable is now stored in @State and
+/// `.cancel()`-ed on dismiss, and the timer is only created when hints are actually visible.
 struct OnboardingHintsOverlay: View {
     @ObservedObject var input: InputState
 
@@ -18,13 +22,15 @@ struct OnboardingHintsOverlay: View {
     @State private var zHinted = false
     @State private var elapsed: TimeInterval = 0
     @State private var allDismissed = false
+    @State private var timerCancellable: AnyCancellable?
+    /// Captured once on appear so the body doesn't reread UserDefaults on every redraw.
+    @State private var alreadySeen: Bool = true
 
     private let maxSeconds: TimeInterval = 8
-    private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ZStack {
-            if !UserDefaults.standard.bool(forKey: key) && !allDismissed {
+            if !alreadySeen && !allDismissed {
                 hintCard("Drag stick →\nsteer + thrust",
                          visible: !stickHinted,
                          alignment: .bottomLeading,
@@ -44,18 +50,33 @@ struct OnboardingHintsOverlay: View {
             }
         }
         .allowsHitTesting(false)
+        .onAppear {
+            alreadySeen = UserDefaults.standard.bool(forKey: key)
+            if !alreadySeen {
+                // Start the polling timer only when we have hints to show.
+                timerCancellable = Timer.publish(every: 0.1, on: .main, in: .common)
+                    .autoconnect()
+                    .sink { _ in
+                        elapsed += 0.1
+                        if elapsed > maxSeconds || (stickHinted && aHinted && bHinted && zHinted) {
+                            dismissAll()
+                        }
+                    }
+            }
+        }
+        .onDisappear { timerCancellable?.cancel() }
         .onChange(of: input.stickX) { _, _ in if input.stickMagnitude > 0.18 { stickHinted = true } }
         .onChange(of: input.stickY) { _, _ in if input.stickMagnitude > 0.18 { stickHinted = true } }
         .onChange(of: input.aPressed) { _, p in if p { aHinted = true } }
         .onChange(of: input.bPressed) { _, p in if p { bHinted = true } }
         .onChange(of: input.zPressed) { _, p in if p { zHinted = true } }
-        .onReceive(timer) { _ in
-            elapsed += 0.1
-            if elapsed > maxSeconds || (stickHinted && aHinted && bHinted && zHinted) {
-                allDismissed = true
-                UserDefaults.standard.set(true, forKey: key)
-            }
-        }
+    }
+
+    private func dismissAll() {
+        allDismissed = true
+        timerCancellable?.cancel()
+        timerCancellable = nil
+        UserDefaults.standard.set(true, forKey: key)
     }
 
     @ViewBuilder
