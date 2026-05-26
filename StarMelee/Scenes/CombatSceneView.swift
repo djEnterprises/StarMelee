@@ -109,6 +109,10 @@ struct CombatSceneView: View {
                     .padding(.trailing, 16)
                 }
                 Spacer()
+                // On tvOS there's no touchscreen — the joystick + button cluster are hidden.
+                // Apple TV play is gamepad-only (or Siri Remote via GCMicroGamepad). On iOS /
+                // iPadOS / Mac Catalyst, the touch controls show as before.
+                #if !os(tvOS)
                 HStack(alignment: .bottom) {
                     AnalogStickView(input: input)
                         .padding(.leading, 24)
@@ -118,6 +122,7 @@ struct CombatSceneView: View {
                         .padding(.trailing, 24)
                         .padding(.bottom, 24)
                 }
+                #endif
             }
         }
         .navigationBarBackButtonHiddenIfAvailable()
@@ -129,7 +134,11 @@ struct CombatSceneView: View {
                 gamepadSource = GamepadInputSource(inputState: input)
             }
         }
+        // `.onKeyPress` is unavailable on tvOS — Apple TV has no key input. Touch / gamepad
+        // remain functional through their separate code paths.
+        #if !os(tvOS)
         .onKeyPress(phases: [.down, .up]) { press in handleKey(press) }
+        #endif
     }
 
     private func makeScene() -> CombatScene {
@@ -153,6 +162,8 @@ struct CombatSceneView: View {
     // Modern SwiftUI .onKeyPress works on Mac Catalyst and on iPad with hardware keyboards.
     // We map each key onto the same InputState fields the touch controls write to, so the
     // gameplay code stays input-agnostic.
+    /// Not available on tvOS — Apple TV has no key input. The function is compiled away there.
+    #if !os(tvOS)
     private func handleKey(_ press: KeyPress) -> KeyPress.Result {
         let pressed = press.phase == .down || press.phase == .repeat
         switch press.key {
@@ -181,9 +192,11 @@ struct CombatSceneView: View {
         }
         return .handled
     }
+    #endif
 
     /// Set stickX, but on release only clear if the current value matches our key direction.
     /// This avoids "release of right arrow" wiping a still-held left arrow.
+    /// Also used by the keyboard handler on iOS / Catalyst (#if !os(tvOS) above gates that).
     private func setStickX(_ newValue: CGFloat, ifMatching match: CGFloat) {
         if newValue != 0 {
             input.stickX = newValue
@@ -196,7 +209,7 @@ struct CombatSceneView: View {
 private extension View {
     @ViewBuilder
     func navigationBarBackButtonHiddenIfAvailable() -> some View {
-        #if os(iOS)
+        #if os(iOS) || os(tvOS)
         self.navigationBarBackButtonHidden(true)
         #else
         self
