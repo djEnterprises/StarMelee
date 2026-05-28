@@ -10,6 +10,11 @@ struct StarMeleeApp: App {
         // Procedural audio pipeline (Section 12). Idle until the first play() call.
         AudioSystem.shared.prepare()
 
+        // Apple identity + cross-platform progression. Both no-op gracefully if the
+        // associated capability isn't enabled in App Store Connect yet.
+        _ = iCloudSyncManager.shared      // initializes the singleton + observers
+        SignInWithAppleManager.shared.verifyExistingCredential()
+
         // App Store version check (no-op until Daniel sets the Apple App ID after first publish).
         // VersionCheckManager.shared.appleAppID = "1234567890"
         Task { _ = await VersionCheckManager.shared.checkForUpdate() }

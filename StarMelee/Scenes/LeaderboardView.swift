@@ -7,6 +7,7 @@ import SwiftUI
 struct LeaderboardView: View {
     @StateObject private var store = LeaderboardStore.shared
     @State private var showResetConfirm = false
+    @State private var showGameCenter = false
 
     private let allianceCyan = Color(.sRGB, red: 0, green: 1.0, blue: 0.84)
     private let dominionRed  = Color(.sRGB, red: 1.0, green: 0.2, blue: 0.4)
@@ -55,6 +56,25 @@ struct LeaderboardView: View {
                     }
                 }
 
+                #if !os(tvOS)
+                Button {
+                    showGameCenter = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "rosette")
+                        Text("VIEW GAME CENTER")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .tracking(2)
+                    }
+                    .foregroundStyle(Color(.sRGB, red: 0, green: 1.0, blue: 0.84))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                    .overlay(Rectangle().stroke(Color(.sRGB, red: 0, green: 1.0, blue: 0.84), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .padding(.bottom, 6)
+                #endif
+
                 Button(role: .destructive) {
                     showResetConfirm = true
                 } label: {
@@ -67,6 +87,12 @@ struct LeaderboardView: View {
                 .padding(.bottom, 14)
             }
         }
+        #if !os(tvOS)
+        .sheet(isPresented: $showGameCenter) {
+            GameCenterDashboardView()
+                .ignoresSafeArea()
+        }
+        #endif
         .confirmationDialog("Reset all leaderboard stats?",
                             isPresented: $showResetConfirm,
                             titleVisibility: .visible) {

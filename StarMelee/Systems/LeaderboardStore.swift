@@ -20,6 +20,24 @@ struct ShipStats: Codable, Equatable {
     var winPercent: Double {
         matchesPlayed > 0 ? Double(wins) / Double(matchesPlayed) * 100 : 0
     }
+
+    /// Merge a local and a remote `ShipStats` — keeps the higher of each cumulative count and
+    /// best-ever streak, so a device that's been offline doesn't accidentally overwrite progress
+    /// made on another device. Called when an iCloud `didChangeExternally` notification fires.
+    static func merging(local: ShipStats, remote: ShipStats) -> ShipStats {
+        ShipStats(
+            matchesPlayed: max(local.matchesPlayed, remote.matchesPlayed),
+            wins: max(local.wins, remote.wins),
+            losses: max(local.losses, remote.losses),
+            currentStreak: max(local.currentStreak, remote.currentStreak),
+            bestStreak: max(local.bestStreak, remote.bestStreak),
+            totalDamageDealt: max(local.totalDamageDealt, remote.totalDamageDealt),
+            totalDamageTaken: max(local.totalDamageTaken, remote.totalDamageTaken),
+            fatalityKills: max(local.fatalityKills, remote.fatalityKills),
+            selfDestructWins: max(local.selfDestructWins, remote.selfDestructWins),
+            forfeits: max(local.forfeits, remote.forfeits)
+        )
+    }
 }
 
 @MainActor
@@ -30,7 +48,41 @@ final class LeaderboardStore: ObservableObject {
     private let storageKey = "leaderboard.stats.v1"
     private var pendingChanges = false
 
-    init() { load() }
+    init() {
+        load()
+        // Re-load whenever another device pushes new leaderboard data via iCloud sync.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleExternalChange),
+            name: iCloudSyncManager.externalChangeNotification,
+            object: nil
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func handleExternalChange() {
+        Task { @MainActor in
+            mergeFromStorage()
+        }
+    }
+
+    /// Merge whatever's currently in iCloud / UserDefaults with the in-memory stats.
+    /// Per-ship merge rule: take the higher of each numeric field (wins > losses > best streak
+    /// etc) so cross-device play doesn't accidentally lose progress.
+    private func mergeFromStorage() {
+        guard let data = iCloudSyncManager.shared.data(forKey: storageKey),
+              let remote = try? JSONDecoder().decode([String: ShipStats].self, from: data) else { return }
+        for (shipID, remoteStats) in remote {
+            if let local = stats[shipID] {
+                stats[shipID] = ShipStats.merging(local: local, remote: remoteStats)
+            } else {
+                stats[shipID] = remoteStats
+            }
+        }
+    }
 
     // MARK: - Lookup
 
@@ -140,14 +192,14 @@ final class LeaderboardStore: ObservableObject {
     // MARK: - Persistence
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
+        guard let data = iCloudSyncManager.shared.data(forKey: storageKey),
               let decoded = try? JSONDecoder().decode([String: ShipStats].self, from: data) else { return }
         stats = decoded
     }
 
     private func save() {
         if let data = try? JSONEncoder().encode(stats) {
-            UserDefaults.standard.set(data, forKey: storageKey)
+            iCloudSyncManager.shared.set(data, forKey: storageKey)
         }
         pendingChanges = false
     }
