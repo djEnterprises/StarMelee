@@ -14,10 +14,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "7D5C00010000000000000020"
-               BuildableName = "StarMeleeTV.app"
-               BlueprintName = "StarMeleeTV"
-               ReferencedContainer = "container:StarMelee.xcodeproj">
+               BlueprintIdentifier = "7D5C00010000000000000009"
+               BuildableName = "Starfighter.app"
+               BlueprintName = "Starfighter"
+               ReferencedContainer = "container:Starfighter.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -28,6 +28,16 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "7D5C00010000000000000011"
+               BuildableName = "StarfighterTests.xctest"
+               BlueprintName = "StarfighterTests"
+               ReferencedContainer = "container:Starfighter.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
@@ -44,10 +54,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "7D5C00010000000000000020"
-            BuildableName = "StarMeleeTV.app"
-            BlueprintName = "StarMeleeTV"
-            ReferencedContainer = "container:StarMelee.xcodeproj">
+            BlueprintIdentifier = "7D5C00010000000000000009"
+            BuildableName = "Starfighter.app"
+            BlueprintName = "Starfighter"
+            ReferencedContainer = "container:Starfighter.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -61,10 +71,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "7D5C00010000000000000020"
-            BuildableName = "StarMeleeTV.app"
-            BlueprintName = "StarMeleeTV"
-            ReferencedContainer = "container:StarMelee.xcodeproj">
+            BlueprintIdentifier = "7D5C00010000000000000009"
+            BuildableName = "Starfighter.app"
+            BlueprintName = "Starfighter"
+            ReferencedContainer = "container:Starfighter.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

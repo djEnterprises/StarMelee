@@ -712,15 +712,15 @@ match_score = (base_win_bonus) +
 ## 20. File Structure (Proposed)
 
 ```
-StarMelee/
+Starfighter/
 ├── README.md
 ├── STAR_MELEE_PLAN.md           ← this document
 ├── star-melee-mockup.html       ← browser prototype reference
 ├── .gitignore
-├── StarMelee.xcodeproj/
-├── StarMelee/
+├── Starfighter.xcodeproj/
+├── Starfighter/
 │   ├── App/
-│   │   ├── StarMeleeApp.swift
+│   │   ├── StarfighterApp.swift
 │   │   ├── AppDelegate.swift
 │   │   └── Info.plist
 │   ├── Scenes/
@@ -770,11 +770,11 @@ StarMelee/
 │       ├── WeaponDefinition.swift
 │       ├── PowerUpDefinition.swift
 │       └── MatchState.swift
-├── StarMeleeTests/
+├── StarfighterTests/
 │   ├── DamageCalculationTests.swift
 │   ├── PhysicsTests.swift
 │   └── MatchStateTests.swift
-└── StarMeleeUITests/
+└── StarfighterUITests/
 ```
 
 ---

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct StarMeleeApp: App {
+struct StarfighterApp: App {
     init() {
         // Non-blocking Game Center authentication. Safe to call even when Game Center is not
         // configured in App Store Connect yet — the manager handles that quietly.

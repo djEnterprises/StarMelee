@@ -10,7 +10,7 @@ import Combine
 /// - Works automatically the moment the user is signed into iCloud on the device
 /// - Synced automatically by iOS / iPadOS / macOS / tvOS in the background
 ///
-/// **Setup requirements (already declared in StarMelee.entitlements):**
+/// **Setup requirements (already declared in Starfighter.entitlements):**
 /// - `com.apple.developer.icloud-container-identifiers` → `iCloud.com.djEnterprises.Starfighter`
 /// - `com.apple.developer.icloud-services` → `[CloudKit, NSUbiquitousKeyValueStore]`
 /// Daniel: when first ready to ship, enable the iCloud capability in App Store Connect
@@ -41,7 +41,7 @@ final class iCloudSyncManager: ObservableObject {
 
     /// Notification posted whenever an external device updates a value we have a local
     /// mirror of. Observers (e.g. `LeaderboardStore`) refresh their in-memory state on this.
-    static let externalChangeNotification = Notification.Name("StarMelee.iCloudSync.externalChange")
+    static let externalChangeNotification = Notification.Name("Starfighter.iCloudSync.externalChange")
 
     private init() {
         // Bootstrap iCloud — `synchronize()` triggers a download of any pending remote changes.

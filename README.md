@@ -6,14 +6,14 @@ A 2D real-time space combat / arena fighter for iOS, iPadOS, macOS, and tvOS.
 Inspired by the *Star Control II* Super Melee mode, with original IP, original ships,
 original art, and a *Mortal Kombat*-style match structure.
 
-> **Naming note:** the product / display name is **Starfighter** (`com.djEnterprises.Starfighter`).
-> The Xcode project, targets, schemes, source folder, and this GitHub repo remain named
-> `StarMelee` internally — renamed branding + identifiers only, to avoid risky project-file
-> churn pre-launch. So you open `StarMelee.xcodeproj` but the app installs as "Starfighter".
+> Bundle ID `com.djEnterprises.Starfighter`. The Xcode project, targets, schemes, source
+> folder, GitHub repo, and Swift module are all named **Starfighter**. (The original design
+> spec was authored under the working title "Star Melee" — that historical doc is preserved
+> in `SuperGrok/` unchanged.)
 
-> **Spec:** see [`STAR_MELEE_PLAN.md`](./STAR_MELEE_PLAN.md) — the complete 26-section design and build plan. Claude Code should read this at the start of every session.
+> **Spec:** see [`STARFIGHTER_PLAN.md`](./STARFIGHTER_PLAN.md) — the complete 26-section design and build plan. Claude Code should read this at the start of every session.
 >
-> **Visual reference:** see [`star-melee-mockup.html`](./star-melee-mockup.html) — interactive browser prototype showing the intended look and feel.
+> **Visual reference:** see [`starfighter-mockup.html`](./starfighter-mockup.html) — interactive browser prototype showing the intended look and feel.
 
 ---
 
@@ -35,20 +35,20 @@ original art, and a *Mortal Kombat*-style match structure.
 
 | Platform | Status | Scheme | Controls |
 |---|---|---|---|
-| **iOS / iPadOS** | ✅ shipping | `StarMelee` | Touch (PS5-style analog stick + 6-button cluster) + hardware keyboard + PS5/Xbox controllers |
-| **macOS** (via Mac Catalyst) | ✅ shipping | `StarMelee` | Keyboard (WASD + Space/F/G/R/Esc) + mouse + PS5/Xbox controllers |
-| **tvOS** (Apple TV) | ✅ shipping | `StarMeleeTV` | PS5/Xbox controllers + Siri Remote (gamepad-only — touch controls hidden) |
+| **iOS / iPadOS** | ✅ shipping | `Starfighter` | Touch (PS5-style analog stick + 6-button cluster) + hardware keyboard + PS5/Xbox controllers |
+| **macOS** (via Mac Catalyst) | ✅ shipping | `Starfighter` | Keyboard (WASD + Space/F/G/R/Esc) + mouse + PS5/Xbox controllers |
+| **tvOS** (Apple TV) | ✅ shipping | `StarfighterTV` | PS5/Xbox controllers + Siri Remote (gamepad-only — touch controls hidden) |
 
 Minimum deployment targets: **iOS 17 / iPadOS 17 / macOS 14 / tvOS 17**.
 
-All four platforms share the same `StarMelee/` source folder via Xcode's `PBXFileSystemSynchronizedRootGroup` — no duplicated source tree. Platform-specific behavior (touch UI, haptics, etc.) is gated with `#if !os(tvOS)` / `#if os(iOS)` source guards.
+All four platforms share the same `Starfighter/` source folder via Xcode's `PBXFileSystemSynchronizedRootGroup` — no duplicated source tree. Platform-specific behavior (touch UI, haptics, etc.) is gated with `#if !os(tvOS)` / `#if os(iOS)` source guards.
 
 ## Project layout
 
-See Section 20 of `STAR_MELEE_PLAN.md` for the full layout. Top level:
+See Section 20 of `STARFIGHTER_PLAN.md` for the full layout. Top level:
 
 ```
-StarMelee/
+Starfighter/
 ├── App/        SwiftUI app entry, Info plist values, asset catalog
 ├── Scenes/     SwiftUI screens + SpriteKit combat scene
 ├── Gameplay/   Ship / Weapon / Planet / Projectile / AI / MatchManager
@@ -61,10 +61,10 @@ StarMelee/
 ## Getting started
 
 ```bash
-open StarMelee.xcodeproj
+open Starfighter.xcodeproj
 ```
 
-In Xcode: select the **StarMelee** scheme and an iPhone or iPad simulator (landscape).
+In Xcode: select the **Starfighter** scheme and an iPhone or iPad simulator (landscape).
 Press ⌘R to run. Phase 1 boots to the SwiftUI main menu; tapping **Play** opens a
 placeholder SpriteKit arena with a parallax starfield. No ships yet — those land in Phase 2.
 
@@ -176,7 +176,7 @@ These are GPL-licensed Star Control reimplementations. They are referenced **onl
 - **The Ur-Quan Masters MegaMod** — <https://github.com/JHGuitarFreak/UQM-MegaMod> — study target for ship physics (thrust, inertia, turn rate), weapon spawn / lifecycle, AI behavior tree, projectile collision, planet gravity, and special-weapon implementations.
 - **TW-Light** — <https://github.com/Yurand/tw-light> — study target for the pure melee loop, camera handling, and multi-ship combat structure.
 
-See Section 3 of `STAR_MELEE_PLAN.md` for the full legal & IP guidelines.
+See Section 3 of `STARFIGHTER_PLAN.md` for the full legal & IP guidelines.
 
 ## License
 

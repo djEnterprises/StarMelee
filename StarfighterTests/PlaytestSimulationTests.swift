@@ -1,6 +1,6 @@
 import XCTest
 import CoreGraphics
-@testable import StarMelee
+@testable import Starfighter
 
 /// Headless gameplay playtest harness.
 ///

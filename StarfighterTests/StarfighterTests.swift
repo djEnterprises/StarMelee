@@ -1,7 +1,7 @@
 import XCTest
-@testable import StarMelee
+@testable import Starfighter
 
-final class StarMeleeTests: XCTestCase {
+final class StarfighterTests: XCTestCase {
 
     func testShipsJSONLoads() throws {
         let ships = ShipDefinition.loadAll(bundle: .main)

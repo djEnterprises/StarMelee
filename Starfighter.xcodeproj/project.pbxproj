@@ -12,25 +12,25 @@
 			containerPortal = 7D5C0001000000000000000A /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 7D5C00010000000000000009;
-			remoteInfo = StarMelee;
+			remoteInfo = Starfighter;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		7D5C00010000000000000001 /* StarMelee.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StarMelee.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		7D5C00010000000000000012 /* StarMeleeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StarMeleeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		7D5C00010000000000000021 /* StarMeleeTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StarMeleeTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7D5C00010000000000000001 /* Starfighter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Starfighter.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7D5C00010000000000000012 /* StarfighterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StarfighterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7D5C00010000000000000021 /* StarfighterTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StarfighterTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		7D5C00010000000000000002 /* StarMelee */ = {
+		7D5C00010000000000000002 /* Starfighter */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = StarMelee;
+			path = Starfighter;
 			sourceTree = "<group>";
 		};
-		7D5C00010000000000000003 /* StarMeleeTests */ = {
+		7D5C00010000000000000003 /* StarfighterTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = StarMeleeTests;
+			path = StarfighterTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -63,8 +63,8 @@
 		7D5C00010000000000000007 = {
 			isa = PBXGroup;
 			children = (
-				7D5C00010000000000000002 /* StarMelee */,
-				7D5C00010000000000000003 /* StarMeleeTests */,
+				7D5C00010000000000000002 /* Starfighter */,
+				7D5C00010000000000000003 /* StarfighterTests */,
 				7D5C00010000000000000008 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -72,9 +72,9 @@
 		7D5C00010000000000000008 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				7D5C00010000000000000001 /* StarMelee.app */,
-				7D5C00010000000000000012 /* StarMeleeTests.xctest */,
-				7D5C00010000000000000021 /* StarMeleeTV.app */,
+				7D5C00010000000000000001 /* Starfighter.app */,
+				7D5C00010000000000000012 /* StarfighterTests.xctest */,
+				7D5C00010000000000000021 /* StarfighterTV.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -82,9 +82,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		7D5C00010000000000000009 /* StarMelee */ = {
+		7D5C00010000000000000009 /* Starfighter */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 7D5C0001000000000000000C /* Build configuration list for PBXNativeTarget "StarMelee" */;
+			buildConfigurationList = 7D5C0001000000000000000C /* Build configuration list for PBXNativeTarget "Starfighter" */;
 			buildPhases = (
 				7D5C00010000000000000006 /* Sources */,
 				7D5C00010000000000000004 /* Frameworks */,
@@ -95,18 +95,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				7D5C00010000000000000002 /* StarMelee */,
+				7D5C00010000000000000002 /* Starfighter */,
 			);
-			name = StarMelee;
+			name = Starfighter;
 			packageProductDependencies = (
 			);
-			productName = StarMelee;
-			productReference = 7D5C00010000000000000001 /* StarMelee.app */;
+			productName = Starfighter;
+			productReference = 7D5C00010000000000000001 /* Starfighter.app */;
 			productType = "com.apple.product-type.application";
 		};
-		7D5C00010000000000000011 /* StarMeleeTests */ = {
+		7D5C00010000000000000011 /* StarfighterTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 7D5C00010000000000000016 /* Build configuration list for PBXNativeTarget "StarMeleeTests" */;
+			buildConfigurationList = 7D5C00010000000000000016 /* Build configuration list for PBXNativeTarget "StarfighterTests" */;
 			buildPhases = (
 				7D5C00010000000000000013 /* Sources */,
 				7D5C00010000000000000014 /* Frameworks */,
@@ -118,18 +118,18 @@
 				7D5C00010000000000000019 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				7D5C00010000000000000003 /* StarMeleeTests */,
+				7D5C00010000000000000003 /* StarfighterTests */,
 			);
-			name = StarMeleeTests;
+			name = StarfighterTests;
 			packageProductDependencies = (
 			);
-			productName = StarMeleeTests;
-			productReference = 7D5C00010000000000000012 /* StarMeleeTests.xctest */;
+			productName = StarfighterTests;
+			productReference = 7D5C00010000000000000012 /* StarfighterTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		7D5C00010000000000000020 /* StarMeleeTV */ = {
+		7D5C00010000000000000020 /* StarfighterTV */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 7D5C00010000000000000025 /* Build configuration list for PBXNativeTarget "StarMeleeTV" */;
+			buildConfigurationList = 7D5C00010000000000000025 /* Build configuration list for PBXNativeTarget "StarfighterTV" */;
 			buildPhases = (
 				7D5C00010000000000000022 /* Sources */,
 				7D5C00010000000000000023 /* Frameworks */,
@@ -140,13 +140,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				7D5C00010000000000000002 /* StarMelee */,
+				7D5C00010000000000000002 /* Starfighter */,
 			);
-			name = StarMeleeTV;
+			name = StarfighterTV;
 			packageProductDependencies = (
 			);
-			productName = StarMeleeTV;
-			productReference = 7D5C00010000000000000021 /* StarMeleeTV.app */;
+			productName = StarfighterTV;
+			productReference = 7D5C00010000000000000021 /* StarfighterTV.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -171,7 +171,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 7D5C0001000000000000000B /* Build configuration list for PBXProject "StarMelee" */;
+			buildConfigurationList = 7D5C0001000000000000000B /* Build configuration list for PBXProject "Starfighter" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -185,9 +185,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				7D5C00010000000000000009 /* StarMelee */,
-				7D5C00010000000000000011 /* StarMeleeTests */,
-				7D5C00010000000000000020 /* StarMeleeTV */,
+				7D5C00010000000000000009 /* Starfighter */,
+				7D5C00010000000000000011 /* StarfighterTests */,
+				7D5C00010000000000000020 /* StarfighterTV */,
 			);
 		};
 /* End PBXProject section */
@@ -243,7 +243,7 @@
 /* Begin PBXTargetDependency section */
 		7D5C00010000000000000019 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 7D5C00010000000000000009 /* StarMelee */;
+			target = 7D5C00010000000000000009 /* Starfighter */;
 			targetProxy = 7D5C0001000000000000001A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -377,10 +377,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = StarMelee/StarMelee.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Starfighter/Starfighter.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"StarMelee/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Starfighter/Preview Content\"";
 				DEVELOPMENT_TEAM = 6M4UR49Z25;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -418,10 +418,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = StarMelee/StarMelee.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Starfighter/Starfighter.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"StarMelee/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Starfighter/Preview Content\"";
 				DEVELOPMENT_TEAM = 6M4UR49Z25;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -470,7 +470,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StarMelee.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/StarMelee";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Starfighter.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Starfighter";
 			};
 			name = Debug;
 		};
@@ -490,7 +490,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StarMelee.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/StarMelee";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Starfighter.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Starfighter";
 			};
 			name = Release;
 		};
@@ -500,7 +500,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"StarMelee/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Starfighter/Preview Content\"";
 				DEVELOPMENT_TEAM = 6M4UR49Z25;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -513,7 +513,7 @@
 				);
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarfighterTV;
-				PRODUCT_NAME = StarMeleeTV;
+				PRODUCT_NAME = StarfighterTV;
 				SDKROOT = appletvos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -532,7 +532,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"StarMelee/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Starfighter/Preview Content\"";
 				DEVELOPMENT_TEAM = 6M4UR49Z25;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -545,7 +545,7 @@
 				);
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarfighterTV;
-				PRODUCT_NAME = StarMeleeTV;
+				PRODUCT_NAME = StarfighterTV;
 				SDKROOT = appletvos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -561,7 +561,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		7D5C0001000000000000000B /* Build configuration list for PBXProject "StarMelee" */ = {
+		7D5C0001000000000000000B /* Build configuration list for PBXProject "Starfighter" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7D5C0001000000000000000D /* Debug */,
@@ -570,7 +570,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		7D5C0001000000000000000C /* Build configuration list for PBXNativeTarget "StarMelee" */ = {
+		7D5C0001000000000000000C /* Build configuration list for PBXNativeTarget "Starfighter" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7D5C0001000000000000000F /* Debug */,
@@ -579,7 +579,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		7D5C00010000000000000016 /* Build configuration list for PBXNativeTarget "StarMeleeTests" */ = {
+		7D5C00010000000000000016 /* Build configuration list for PBXNativeTarget "StarfighterTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7D5C00010000000000000017 /* Debug */,
@@ -588,7 +588,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		7D5C00010000000000000025 /* Build configuration list for PBXNativeTarget "StarMeleeTV" */ = {
+		7D5C00010000000000000025 /* Build configuration list for PBXNativeTarget "StarfighterTV" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7D5C00010000000000000026 /* Debug */,
