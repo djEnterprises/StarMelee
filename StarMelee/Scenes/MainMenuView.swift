@@ -12,7 +12,7 @@ struct MainMenuView: View {
                     Spacer()
 
                     VStack(spacing: 8) {
-                        Text("STAR MELEE")
+                        Text("STARFIGHTER")
                             .font(.system(size: 64, weight: .black, design: .rounded))
                             .tracking(8)
                             .foregroundStyle(

@@ -4,7 +4,7 @@ import CoreGraphics
 import GameController
 #endif
 
-/// Clean abstraction over the different input sources Star Melee supports.
+/// Clean abstraction over the different input sources Starfighter supports.
 ///
 /// **Plan reference:** SuperGrok Section 16.6 — Game Controller support is required for v1.0.
 ///

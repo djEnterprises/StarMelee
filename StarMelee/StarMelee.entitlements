@@ -8,14 +8,14 @@
 	</array>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
-		<string>iCloud.com.djEnterprises.StarMelee</string>
+		<string>iCloud.com.djEnterprises.Starfighter</string>
 	</array>
 	<key>com.apple.developer.icloud-services</key>
 	<array>
 		<string>CloudKit</string>
 	</array>
 	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
-	<string>$(TeamIdentifierPrefix)com.djEnterprises.StarMelee</string>
+	<string>$(TeamIdentifierPrefix)com.djEnterprises.Starfighter</string>
 	<key>com.apple.developer.game-center</key>
 	<true/>
 </dict>

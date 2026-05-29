@@ -88,7 +88,7 @@ struct CombatHUDOverlay: View {
 
     private var matchCenterPanel: some View {
         VStack(spacing: 2) {
-            Text("STAR MELEE")
+            Text("STARFIGHTER")
                 .font(.system(size: 11, weight: .heavy, design: .rounded))
                 .tracking(4)
                 .foregroundStyle(.white.opacity(0.7))

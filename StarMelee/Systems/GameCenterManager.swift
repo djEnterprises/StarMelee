@@ -19,15 +19,15 @@ final class GameCenterManager {
 
     // Leaderboard / achievement IDs (use exact strings or your reverse-domain equivalents)
     enum LeaderboardID {
-        static let totalWins  = "com.djEnterprises.starmelee.wins"
-        static let winStreak  = "com.djEnterprises.starmelee.win_streak"
+        static let totalWins  = "com.djEnterprises.starfighter.wins"
+        static let winStreak  = "com.djEnterprises.starfighter.win_streak"
     }
     enum AchievementID {
-        static let firstBlood   = "com.djEnterprises.starmelee.first_blood"
-        static let onARoll      = "com.djEnterprises.starmelee.on_a_roll"
-        static let shipMaster   = "com.djEnterprises.starmelee.ship_master"
-        static let untouchable  = "com.djEnterprises.starmelee.untouchable"
-        static let fatality     = "com.djEnterprises.starmelee.fatality"
+        static let firstBlood   = "com.djEnterprises.starfighter.first_blood"
+        static let onARoll      = "com.djEnterprises.starfighter.on_a_roll"
+        static let shipMaster   = "com.djEnterprises.starfighter.ship_master"
+        static let untouchable  = "com.djEnterprises.starfighter.untouchable"
+        static let fatality     = "com.djEnterprises.starfighter.fatality"
     }
 
     private(set) var isAuthenticated: Bool = false

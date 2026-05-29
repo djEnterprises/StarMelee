@@ -1,10 +1,15 @@
-# Star Melee
+# Starfighter
 
 **Strategic ship-to-ship arena combat across the stars.**
 
-A 2D real-time space combat / arena fighter for iOS, iPadOS, macOS, and (later) tvOS.
+A 2D real-time space combat / arena fighter for iOS, iPadOS, macOS, and tvOS.
 Inspired by the *Star Control II* Super Melee mode, with original IP, original ships,
 original art, and a *Mortal Kombat*-style match structure.
+
+> **Naming note:** the product / display name is **Starfighter** (`com.djEnterprises.Starfighter`).
+> The Xcode project, targets, schemes, source folder, and this GitHub repo remain named
+> `StarMelee` internally — renamed branding + identifiers only, to avoid risky project-file
+> churn pre-launch. So you open `StarMelee.xcodeproj` but the app installs as "Starfighter".
 
 > **Spec:** see [`STAR_MELEE_PLAN.md`](./STAR_MELEE_PLAN.md) — the complete 26-section design and build plan. Claude Code should read this at the start of every session.
 >

@@ -384,7 +384,7 @@
 				DEVELOPMENT_TEAM = 6M4UR49Z25;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Star Melee";
+				INFOPLIST_KEY_CFBundleDisplayName = Starfighter;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -399,7 +399,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarMelee;
+				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.Starfighter;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTS_MACCATALYST = YES;
@@ -425,7 +425,7 @@
 				DEVELOPMENT_TEAM = 6M4UR49Z25;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Star Melee";
+				INFOPLIST_KEY_CFBundleDisplayName = Starfighter;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -440,7 +440,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarMelee;
+				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.Starfighter;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTS_MACCATALYST = YES;
@@ -465,7 +465,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarMeleeTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarfighterTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -485,7 +485,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarMeleeTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarfighterTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -504,7 +504,7 @@
 				DEVELOPMENT_TEAM = 6M4UR49Z25;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Star Melee";
+				INFOPLIST_KEY_CFBundleDisplayName = Starfighter;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -512,7 +512,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarMeleeTV;
+				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarfighterTV;
 				PRODUCT_NAME = StarMeleeTV;
 				SDKROOT = appletvos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -536,7 +536,7 @@
 				DEVELOPMENT_TEAM = 6M4UR49Z25;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Star Melee";
+				INFOPLIST_KEY_CFBundleDisplayName = Starfighter;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -544,7 +544,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarMeleeTV;
+				PRODUCT_BUNDLE_IDENTIFIER = com.djEnterprises.StarfighterTV;
 				PRODUCT_NAME = StarMeleeTV;
 				SDKROOT = appletvos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

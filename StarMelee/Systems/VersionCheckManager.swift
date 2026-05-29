@@ -17,7 +17,7 @@ final class VersionCheckManager {
     var appleAppID: String = ""
 
     /// User-facing app name for the alert message.
-    var appName: String = "Star Melee"
+    var appName: String = "Starfighter"
 
     private let lastCheckKey = "versionCheck.lastCheckDate"
     private let lastPromptedVersionKey = "versionCheck.lastPromptedVersion"

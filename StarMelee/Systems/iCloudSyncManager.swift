@@ -5,13 +5,13 @@ import Combine
 /// Key-Value Storage) with a UserDefaults fallback.
 ///
 /// **Why iCloud KVS instead of CloudKit:**
-/// - Star Melee's progression data is small (per-ship stats, win streaks, settings, achievements)
+/// - Starfighter's progression data is small (per-ship stats, win streaks, settings, achievements)
 /// - KVS is dead-simple, no schemas, no async, no zone management, no quota worries (1 MB total)
 /// - Works automatically the moment the user is signed into iCloud on the device
 /// - Synced automatically by iOS / iPadOS / macOS / tvOS in the background
 ///
 /// **Setup requirements (already declared in StarMelee.entitlements):**
-/// - `com.apple.developer.icloud-container-identifiers` → `iCloud.com.djEnterprises.StarMelee`
+/// - `com.apple.developer.icloud-container-identifiers` → `iCloud.com.djEnterprises.Starfighter`
 /// - `com.apple.developer.icloud-services` → `[CloudKit, NSUbiquitousKeyValueStore]`
 /// Daniel: when first ready to ship, enable the iCloud capability in App Store Connect
 /// Identifiers → Capabilities. Until enabled, all KVS calls quietly no-op and we fall back
@@ -115,7 +115,7 @@ final class iCloudSyncManager: ObservableObject {
     // MARK: - Lifecycle hooks
 
     @objc private func handleExternalChange(_ notification: Notification) {
-        // Re-broadcast as a Star Melee-specific notification so observers don't have to
+        // Re-broadcast as a Starfighter-specific notification so observers don't have to
         // import the raw KVS notification name.
         guard isEnabled else { return }
         NotificationCenter.default.post(name: Self.externalChangeNotification, object: nil)
