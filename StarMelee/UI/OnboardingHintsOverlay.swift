@@ -31,12 +31,14 @@ struct OnboardingHintsOverlay: View {
     var body: some View {
         ZStack {
             if !alreadySeen && !allDismissed {
-                hintCard("Drag stick →\nsteer + thrust",
+                // Stick turns the ship; the X button thrusts. (The stick does NOT thrust —
+                // calling that out explicitly here because it's the most common confusion.)
+                hintCard("Drag stick → TURN\nX button → THRUST",
                          visible: !stickHinted,
                          alignment: .bottomLeading,
                          offsetX: 180, offsetY: -110)
 
-                hintCard("A = primary fire\nB = guided missile",
+                hintCard("A = primary fire\nB = secondary fire",
                          visible: !aHinted || !bHinted,
                          alignment: .bottomTrailing,
                          offsetX: -160, offsetY: -130,

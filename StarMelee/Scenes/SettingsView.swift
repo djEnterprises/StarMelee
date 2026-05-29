@@ -107,6 +107,13 @@ struct SettingsView: View {
         .onAppear {
             signInManager.verifyExistingCredential()
         }
+        .onChange(of: iCloudSyncEnabled) { _, nowEnabled in
+            if nowEnabled {
+                // User just (re-)enabled sync — push whatever they've accumulated locally up to
+                // iCloud so a device that played offline doesn't get overwritten by an empty cloud.
+                iCloudSyncManager.shared.pushAllLocalToCloud(keys: ["leaderboard.stats.v1"])
+            }
+        }
     }
 
     // MARK: - Apple Account section
@@ -186,7 +193,11 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(displayName ?? "Signed in with Apple")
                         .font(.system(size: 14, weight: .semibold))
-                    Text("Cross-platform progression active.")
+                    // Be precise: progression sync is governed by the iCloud Sync toggle below,
+                    // not by sign-in itself. Reflect the actual sync state here.
+                    Text(iCloudSyncEnabled
+                         ? "Apple ID linked · iCloud sync on"
+                         : "Apple ID linked · iCloud sync off")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

@@ -24,8 +24,11 @@ struct CombatSceneView: View {
 
             CombatHUDOverlay(gameState: gameState)
 
-            // First-match onboarding hints — no-op after the player completes their first match.
+            // First-match onboarding hints — touch-control specific, so iOS / iPadOS / Catalyst
+            // only. On tvOS the hints would reference a touch stick that doesn't exist.
+            #if !os(tvOS)
             OnboardingHintsOverlay(input: input)
+            #endif
 
             if gameState.seriesEnded {
                 VictoryView(

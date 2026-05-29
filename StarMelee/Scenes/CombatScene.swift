@@ -609,7 +609,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             gs.inPreMatch = true
             gs.inActiveMatch = false
             gs.preMatchSecondsRemaining = remaining
-            gs.matchSecondsRemaining = MatchManager.activeMatchSeconds
+            gs.matchSecondsRemaining = matchManager.matchDuration
         case .active(let remaining):
             gs.inPreMatch = false
             gs.inActiveMatch = true

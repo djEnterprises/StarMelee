@@ -75,13 +75,19 @@ final class LeaderboardStore: ObservableObject {
     private func mergeFromStorage() {
         guard let data = iCloudSyncManager.shared.data(forKey: storageKey),
               let remote = try? JSONDecoder().decode([String: ShipStats].self, from: data) else { return }
+        var changed = false
         for (shipID, remoteStats) in remote {
             if let local = stats[shipID] {
-                stats[shipID] = ShipStats.merging(local: local, remote: remoteStats)
+                let merged = ShipStats.merging(local: local, remote: remoteStats)
+                if merged != local { stats[shipID] = merged; changed = true }
             } else {
                 stats[shipID] = remoteStats
+                changed = true
             }
         }
+        // Persist the merged result so it survives an app kill before the next match end,
+        // and so the merged values propagate back out to other devices.
+        if changed { save() }
     }
 
     // MARK: - Lookup

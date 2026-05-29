@@ -103,7 +103,9 @@ struct CombatHUDOverlay: View {
     }
 
     private var formattedTimer: String {
-        let s = gameState.inActiveMatch ? gameState.matchSecondsRemaining : MatchManager.activeMatchSeconds
+        // CombatScene mirrors the configured match duration into matchSecondsRemaining during
+        // pre-match, so this value is correct in every phase regardless of the chosen length.
+        let s = gameState.matchSecondsRemaining
         let secs = max(0, Int(ceil(s)))
         return String(format: "%d:%02d", secs / 60, secs % 60)
     }

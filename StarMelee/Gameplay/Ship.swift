@@ -251,6 +251,12 @@ final class Ship: SKNode {
             velocity.dy *= retention
         }
 
+        // Fun Modifier: "No Ship Inertia" (player only) — arcade feel. When the player isn't
+        // thrusting, kill residual velocity so the ship stops the instant thrust is released.
+        if side == .player && !effectiveThrust && FunModifiers.shared.noShipInertia {
+            velocity = .zero
+        }
+
         // Integrate position
         position.x += velocity.dx * dtf
         position.y += velocity.dy * dtf

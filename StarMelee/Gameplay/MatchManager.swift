@@ -32,9 +32,14 @@ final class MatchManager {
 
     // MARK: - Constants
     static let preMatchSeconds: TimeInterval = 10
-    static let activeMatchSeconds: TimeInterval = 120   // Section 4: 2-minute timer
+    static let defaultMatchSeconds: TimeInterval = 120   // Section 4: 2-minute timer (default)
     static let interMatchSeconds: TimeInterval = 3
     static let gravityRampSeconds: TimeInterval = 5     // Section 23 #3
+
+    /// Per-match active duration. Read from the `settings.matchLengthSeconds` picker
+    /// (90 / 120 / 180 / 300) at construction; falls back to the 120s default. This makes the
+    /// Settings → Match Length control actually take effect (previously it was ignored).
+    let matchDuration: TimeInterval
 
     // MARK: - State
     private(set) var phase: Phase = .preMatch(remaining: MatchManager.preMatchSeconds)
@@ -44,6 +49,17 @@ final class MatchManager {
     /// Persists across the inter-match phase so the series-end victory screen knows whether
     /// to show FATALITY (Section 4 step 8). Reset when a new match starts.
     private var lastMatchFatality: Bool = false
+
+    /// - Parameter matchDuration: per-match seconds. Pass `nil` to read the player's
+    ///   `settings.matchLengthSeconds` preference (default 120).
+    init(matchDuration: TimeInterval? = nil) {
+        if let matchDuration {
+            self.matchDuration = matchDuration
+        } else {
+            let saved = UserDefaults.standard.object(forKey: "settings.matchLengthSeconds") as? Int
+            self.matchDuration = TimeInterval(saved ?? Int(Self.defaultMatchSeconds))
+        }
+    }
 
     /// Section 23 #8: gameplay code reads this single flag. Primary + secondary fire ignore it
     /// (they always work in active phases); specials, combos, and boost respect it.
@@ -103,7 +119,7 @@ final class MatchManager {
         case .preMatch(let remaining):
             let next = remaining - dt
             if next <= 0 {
-                phase = .active(remaining: Self.activeMatchSeconds)
+                phase = .active(remaining: matchDuration)
                 return .countdownEnded
             }
             phase = .preMatch(remaining: next)

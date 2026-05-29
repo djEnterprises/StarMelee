@@ -34,7 +34,7 @@ struct FunModifiersView: View {
 
             Section("Combat") {
                 modifierRow("Unlimited Specials",
-                            description: "Special-weapon cooldowns are zero. (Phase 3 — wires when specials land.)",
+                            description: "Special-weapon cooldown and battery cost are zero.",
                             value: $unlimitedSpecials)
                 modifierRow("Unlimited Speed Boost",
                             description: "Boost has no battery cost and no cooldown.",
@@ -49,7 +49,7 @@ struct FunModifiersView: View {
                             description: "Planets stop pulling on ships. Crash damage still applies.",
                             value: $noPlanetGravity)
                 modifierRow("No Ship Inertia",
-                            description: "Ships stop instantly when thrust is released. (Phase 4 — wires when arcade-mode physics lands.)",
+                            description: "Your ship stops instantly when you release thrust (arcade feel — no drifting).",
                             value: $noShipInertia)
             }
 
