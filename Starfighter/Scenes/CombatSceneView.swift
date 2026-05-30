@@ -10,17 +10,25 @@ struct CombatSceneView: View {
     @StateObject private var gameState = GameState()
     @Environment(\.dismiss) private var dismiss
     @FocusState private var sceneFocused: Bool
-    @State private var sceneRef: CombatScene?
+    @State private var scene: CombatScene?
     @State private var gamepadSource: GamepadInputSource?
 
     var body: some View {
         ZStack {
-            SpriteView(
-                scene: makeScene(),
-                options: [.ignoresSiblingOrder],
-                debugOptions: []
-            )
-            .ignoresSafeArea()
+            // The scene is built exactly once (in `.onAppear`) and held in `@State`.
+            // Constructing it inside `body` would rebuild the entire scene graph
+            // (starfield, planets, ships, physics world) on every `gameState`/`input`
+            // publish — many times per second during a match.
+            if let scene {
+                SpriteView(
+                    scene: scene,
+                    options: [.ignoresSiblingOrder],
+                    debugOptions: []
+                )
+                .ignoresSafeArea()
+            } else {
+                Color.black.ignoresSafeArea()
+            }
 
             CombatHUDOverlay(gameState: gameState)
 
@@ -47,12 +55,12 @@ struct CombatSceneView: View {
                     onResume:  { setPaused(false) },
                     onRestart: {
                         // Section 9: Restart counts as a loss for the current match.
-                        sceneRef?.restartCurrentMatchAsLoss()
+                        scene?.restartCurrentMatchAsLoss()
                         setPaused(false)
                     },
                     onQuit:    {
                         // Section 9: Quit is a forfeit. Record before dismissing.
-                        sceneRef?.recordForfeitIfInProgress()
+                        scene?.recordForfeitIfInProgress()
                         dismiss()
                     }
                 )
@@ -133,6 +141,9 @@ struct CombatSceneView: View {
         .focused($sceneFocused)
         .onAppear {
             sceneFocused = true
+            if scene == nil {
+                scene = makeScene()
+            }
             if gamepadSource == nil {
                 gamepadSource = GamepadInputSource(inputState: input)
             }
@@ -150,14 +161,12 @@ struct CombatSceneView: View {
         scene.scaleMode = .resizeFill
         scene.input = input
         scene.gameState = gameState
-        // SpriteKit owns the scene; we keep a reference so the pause toggle can reach it.
-        DispatchQueue.main.async { self.sceneRef = scene }
         return scene
     }
 
     private func setPaused(_ paused: Bool) {
         gameState.isPaused = paused
-        sceneRef?.customPaused = paused
+        scene?.customPaused = paused
     }
 
     // MARK: - Keyboard (Section 10)

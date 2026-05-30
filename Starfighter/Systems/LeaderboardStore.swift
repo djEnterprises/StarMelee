@@ -48,6 +48,12 @@ final class LeaderboardStore: ObservableObject {
     private let storageKey = "leaderboard.stats.v1"
     private var pendingChanges = false
 
+    /// Per-ship damage accumulated during the current match. Kept out of the `@Published`
+    /// `stats` dictionary so a projectile hit doesn't fire `objectWillChange` (and a
+    /// dictionary copy-mutate-write) on every contact. Folded into `stats` once in `flushDamage()`.
+    private var pendingDamageDealt: [String: Double] = [:]
+    private var pendingDamageTaken: [String: Double] = [:]
+
     init() {
         load()
         // Re-load whenever another device pushes new leaderboard data via iCloud sync.
@@ -173,21 +179,30 @@ final class LeaderboardStore: ObservableObject {
     /// Saving on every projectile hit would thrash UserDefaults; flushing once per match is
     /// cheap and sufficient.
     func addDamageDealt(shipID: String, amount: Double) {
-        var s = stats(for: shipID)
-        s.totalDamageDealt += amount
-        stats[shipID] = s
+        pendingDamageDealt[shipID, default: 0] += amount
         pendingChanges = true
     }
 
     func addDamageTaken(shipID: String, amount: Double) {
-        var s = stats(for: shipID)
-        s.totalDamageTaken += amount
-        stats[shipID] = s
+        pendingDamageTaken[shipID, default: 0] += amount
         pendingChanges = true
     }
 
     func flushDamage() {
-        if pendingChanges { save() }
+        guard pendingChanges else { return }
+        for (shipID, amount) in pendingDamageDealt {
+            var s = stats(for: shipID)
+            s.totalDamageDealt += amount
+            stats[shipID] = s
+        }
+        for (shipID, amount) in pendingDamageTaken {
+            var s = stats(for: shipID)
+            s.totalDamageTaken += amount
+            stats[shipID] = s
+        }
+        pendingDamageDealt.removeAll()
+        pendingDamageTaken.removeAll()
+        save()
     }
 
     func resetAll() {

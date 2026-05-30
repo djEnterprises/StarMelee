@@ -42,8 +42,6 @@ final class VersionCheckManager {
                 return .skipped(reason: "checked within last 24h")
             }
         }
-        UserDefaults.standard.set(Date(), forKey: lastCheckKey)
-
         guard let url = URL(string: "https://itunes.apple.com/lookup?id=\(appleAppID)&country=US") else {
             return .skipped(reason: "bad URL")
         }
@@ -57,6 +55,9 @@ final class VersionCheckManager {
             else {
                 return .skipped(reason: "unexpected response shape")
             }
+            // Only mark "checked today" after a successful lookup — a transient network
+            // failure shouldn't suppress retries for the next 24h.
+            UserDefaults.standard.set(Date(), forKey: lastCheckKey)
             return isNewer(latest, than: current)
                 ? .updateAvailable(latest: latest, current: current)
                 : .current
