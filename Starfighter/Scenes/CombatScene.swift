@@ -470,6 +470,8 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
                                             in: worldNode)
             juice.slowMo(.shipDestruction)
             juice.shake(.heavy)
+            juice.hitStop(GameFeel.hitStopKill)
+            juice.cameraPunch(in: cameraNode)
             HapticsSystem.shared.play(.playerDestroyed)
             AudioSystem.shared.play(.destruction)
         }
@@ -480,6 +482,8 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
                                             in: worldNode)
             juice.slowMo(.shipDestruction)
             juice.shake(.medium)
+            juice.hitStop(GameFeel.hitStopKill)
+            juice.cameraPunch(in: cameraNode)
             AudioSystem.shared.play(.destruction)   // audible to player but no haptic on AI death
         }
 
@@ -647,7 +651,13 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         gs.cameraViewport = cameraRect
         gs.playerWorldPos = playerShip.position
         gs.enemyWorldPos = enemyShip.position
-        gs.powerUpMarkers = activePowerUps.map { $0.position }
+        // Avoid allocating a fresh array every frame when no power-ups are active (the common
+        // case between spawns). The `powerUpMarkers` didSet equality guard then skips the publish.
+        if activePowerUps.isEmpty {
+            if !gs.powerUpMarkers.isEmpty { gs.powerUpMarkers = [] }
+        } else {
+            gs.powerUpMarkers = activePowerUps.map { $0.position }
+        }
     }
 
     private func handlePhaseChange(_ change: MatchManager.PhaseChange) {
@@ -794,6 +804,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         if proj.firedBy == target.side { return }
         let damage = proj.computeDamage(against: target)
         target.takeDamage(damage)
+        // Phase 1 game feel: a brief hit-stop scaled to damage gives the impact weight. Fires for
+        // both sides (unlike haptics, which are player-only) — freezing the sim reads globally.
+        juice.hitStop(GameFeel.hitStopDuration(forDamage: damage))
         // Section 17: track damage on the PLAYER's ship only (their leaderboard entry).
         if proj.firedBy == .player && target.side == .opponent {
             LeaderboardStore.shared.addDamageDealt(shipID: playerShip.definition.id, amount: Double(damage))

@@ -15,38 +15,62 @@ import CoreGraphics
 @MainActor
 final class JuiceSystem {
 
+    /// Cached once at init. Settings (Reduce Motion) are only reachable from the main menu,
+    /// never mid-match, and a fresh `JuiceSystem` is created with each `CombatScene`, so the
+    /// value can't go stale during play. Caching avoids a `UserDefaults` read + `String`
+    /// allocation on every shake / slow-mo / vignette / shockwave in the per-frame damage path.
+    private let motionScale: CGFloat = {
+        switch UserDefaults.standard.string(forKey: "settings.reduceMotion") ?? "off" {
+        case "reduced":  return 0.25    // dampened
+        case "disabled": return 0.0     // off entirely
+        default:         return 1.0     // full effects
+        }
+    }()
+
     // MARK: - Camera shake
 
     enum ShakeStrength {
         case light, medium, heavy, massive
 
-        /// Initial amplitude (points) and duration (seconds).
-        var profile: (amplitude: CGFloat, durationSeconds: TimeInterval) {
+        /// Trauma contributed by this tier (see `GameFeel`). Trauma accumulates (capped at 1)
+        /// and decays; actual shake is trauma^exponent for an organic, non-linear falloff.
+        var trauma: CGFloat {
             switch self {
-            case .light:   return (4,  8.0 / 60.0)
-            case .medium:  return (8,  14.0 / 60.0)
-            case .heavy:   return (14, 22.0 / 60.0)
-            case .massive: return (22, 36.0 / 60.0)
+            case .light:   return GameFeel.traumaLight
+            case .medium:  return GameFeel.traumaMedium
+            case .heavy:   return GameFeel.traumaHeavy
+            case .massive: return GameFeel.traumaMassive
             }
         }
     }
 
-    private var shakeAmplitude: CGFloat = 0
-    private var shakeSecondsRemaining: TimeInterval = 0
-    private var shakeDecayPerSecond: CGFloat = 0
+    /// Accumulated trauma (0...1). Decays every frame in `apply(dt:)`.
+    private var trauma: CGFloat = 0
+    /// Monotonic seed advanced each frame so the per-axis noise varies smoothly over time
+    /// instead of being pure white noise (smoother = more "camera-operator", less "jackhammer").
+    private var shakeSeed: CGFloat = 0
 
-    /// Request a shake. Stronger requests override weaker ones in progress.
+    /// Request a shake. Trauma accumulates (stronger events stack toward the cap) rather than
+    /// simply overriding, so a flurry of hits builds intensity naturally.
     func shake(_ strength: ShakeStrength) {
-        let scale = motionScale
-        guard scale > 0 else { return }
-        let (amp, dur) = strength.profile
-        let scaled = amp * scale
-        if scaled > shakeAmplitude {
-            shakeAmplitude = scaled
-            shakeSecondsRemaining = dur
-            // Decay rate so amplitude reaches ~0 by the end of the window.
-            shakeDecayPerSecond = scaled / CGFloat(dur)
-        }
+        addTrauma(strength.trauma)
+    }
+
+    /// Add raw trauma (0...1 contribution), scaled by the Reduce-Motion setting and capped at 1.
+    func addTrauma(_ amount: CGFloat) {
+        guard motionScale > 0 else { return }
+        trauma = min(1, trauma + amount * motionScale)
+    }
+
+    // MARK: - Hit-stop (frame freeze)
+
+    private var hitStopRemaining: TimeInterval = 0
+
+    /// Briefly freeze gameplay simulation for `seconds` to give an impact weight. The juice and
+    /// particle layers keep animating (they tick on real time / SKActions). Longest request wins.
+    func hitStop(_ seconds: TimeInterval) {
+        guard motionScale > 0, seconds > 0 else { return }
+        hitStopRemaining = max(hitStopRemaining, seconds * Double(motionScale))
     }
 
     // MARK: - Time dilation
@@ -79,13 +103,17 @@ final class JuiceSystem {
         }
     }
 
-    /// Returns the dt multiplier to apply to gameplay this frame.
-    /// Always 1.0 if no slow-mo is active.
-    var currentTimeScale: CGFloat { timeScale }
+    /// Returns the dt multiplier to apply to gameplay this frame. 1.0 normally; a small slow-mo
+    /// value during time dilation; near-zero during a hit-stop freeze (whichever is slower wins).
+    var currentTimeScale: CGFloat {
+        hitStopRemaining > 0 ? min(timeScale, GameFeel.hitStopTimeScale) : timeScale
+    }
 
     // MARK: - Per-frame tick
 
-    /// Evolve shake + slow-mo state. Apply the resulting shake offset to the camera.
+    /// Evolve slow-mo, hit-stop, and trauma-based shake state, then position the camera at the
+    /// smoothed-follow target plus a shake offset + roll. Driven by REAL dt so juice keeps its
+    /// pace even while gameplay is frozen by hit-stop or slowed by time dilation.
     func apply(dt: TimeInterval, to camera: SKCameraNode, cameraTargetPosition: CGPoint) {
         // Slow-mo decay
         slowMoSecondsRemaining -= dt
@@ -94,20 +122,40 @@ final class JuiceSystem {
             slowMoSecondsRemaining = 0
         }
 
-        // Shake decay
-        shakeSecondsRemaining -= dt
-        if shakeSecondsRemaining <= 0 {
-            shakeAmplitude = 0
-            shakeSecondsRemaining = 0
-        } else {
-            shakeAmplitude = max(0, shakeAmplitude - shakeDecayPerSecond * CGFloat(dt))
+        // Hit-stop decay (real time, so the freeze lasts a fixed wall-clock duration)
+        if hitStopRemaining > 0 {
+            hitStopRemaining = max(0, hitStopRemaining - dt)
         }
 
-        // Apply offset: position the camera at the smoothed-follow target, plus a random nudge.
-        let ox = (shakeAmplitude > 0) ? CGFloat.random(in: -shakeAmplitude...shakeAmplitude) : 0
-        let oy = (shakeAmplitude > 0) ? CGFloat.random(in: -shakeAmplitude...shakeAmplitude) : 0
+        // Trauma decay → shake = trauma^exponent (organic, fast falloff)
+        trauma = max(0, trauma - GameFeel.traumaDecayPerSecond * CGFloat(dt))
+        let shake = pow(trauma, GameFeel.traumaExponent)
+
+        var ox: CGFloat = 0, oy: CGFloat = 0, roll: CGFloat = 0
+        if shake > 0 {
+            shakeSeed += CGFloat(dt) * 40        // advance the noise phase
+            // Decorrelated sine "noise" per channel — smoother than white noise, no extra deps.
+            ox   = GameFeel.shakeMaxOffset * shake * sin(shakeSeed * 1.0 + 0.0)
+            oy   = GameFeel.shakeMaxOffset * shake * sin(shakeSeed * 1.3 + 2.1)
+            roll = GameFeel.shakeMaxAngle  * shake * sin(shakeSeed * 1.7 + 4.2)
+        }
         camera.position = CGPoint(x: cameraTargetPosition.x + ox,
                                   y: cameraTargetPosition.y + oy)
+        camera.zRotation = roll
+    }
+
+    // MARK: - Camera punch-zoom
+
+    /// A brief zoom-in kick on big moments (explosions, boss death). Independent of the per-frame
+    /// position/shake handling — runs as an SKAction on the camera's scale and eases back out.
+    func cameraPunch(in camera: SKCameraNode) {
+        guard motionScale > 0 else { return }
+        let target = 1 - GameFeel.cameraPunchAmount * motionScale   // <1 zooms in
+        let punchIn = SKAction.scale(to: target, duration: GameFeel.cameraPunchInDuration)
+        punchIn.timingMode = .easeOut
+        let punchOut = SKAction.scale(to: 1.0, duration: GameFeel.cameraPunchOutDuration)
+        punchOut.timingMode = .easeInEaseOut
+        camera.run(SKAction.sequence([punchIn, punchOut]), withKey: "cameraPunch")
     }
 
     // MARK: - Shockwaves
@@ -187,40 +235,33 @@ final class JuiceSystem {
         guard scale > 0 else { return }
         let peakAlpha: CGFloat = min(0.55, 0.20 + strength * 0.4) * scale
 
-        // Build a large rounded-rect "frame" — colored ring around the screen edges so the
+        // A single reusable rounded-rect "frame" — colored ring around the screen edges so the
         // center stays clearly visible. Sized to comfortably cover any iOS/iPad/tvOS/Mac
-        // viewport without needing to know the actual SKView size.
-        let frame = SKShapeNode(rectOf: CGSize(width: 4000, height: 4000), cornerRadius: 24)
-        frame.lineWidth = 220
-        frame.strokeColor = SKColor(red: 1.0, green: 0.15, blue: 0.20, alpha: peakAlpha)
-        frame.fillColor = .clear
-        frame.glowWidth = 60
-        frame.alpha = 0
-        frame.zPosition = 999       // above all gameplay nodes
-        frame.position = .zero       // centered on camera
-        camera.addChild(frame)
+        // viewport without needing to know the actual SKView size. The node is created once per
+        // camera and reused on every subsequent hit (rebuilding a 4000×4000 glow-stroked
+        // SKShapeNode several times a second under sustained fire was a real frame-time cost).
+        let vignette: SKShapeNode
+        if let existing = camera.childNode(withName: "juiceVignette") as? SKShapeNode {
+            vignette = existing
+            vignette.removeAllActions()
+        } else {
+            let frame = SKShapeNode(rectOf: CGSize(width: 4000, height: 4000), cornerRadius: 24)
+            frame.name = "juiceVignette"
+            frame.lineWidth = 220
+            frame.fillColor = .clear
+            frame.glowWidth = 60
+            frame.zPosition = 999       // above all gameplay nodes
+            frame.position = .zero       // centered on camera
+            camera.addChild(frame)
+            vignette = frame
+        }
+        vignette.strokeColor = SKColor(red: 1.0, green: 0.15, blue: 0.20, alpha: peakAlpha)
+        vignette.alpha = 0
 
         let fadeIn = SKAction.fadeAlpha(to: 1.0, duration: 0.05)
         let hold = SKAction.wait(forDuration: 0.08)
         let fadeOut = SKAction.fadeAlpha(to: 0.0, duration: 0.30 + Double(strength) * 0.15)
-        frame.run(SKAction.sequence([fadeIn, hold, fadeOut])) { [weak frame] in
-            frame?.removeFromParent()
-        }
+        vignette.run(SKAction.sequence([fadeIn, hold, fadeOut]))
     }
 
-    // MARK: - Reduce Motion gate
-
-    /// 0.0 = effects fully disabled; 1.0 = effects at full strength.
-    /// Reads `settings.reduceMotion` UserDefaults key (set via the Accessibility settings section).
-    /// The OS-level Reduce Motion preference will be folded in once a Phase 4 settings pass
-    /// listens to `UIAccessibility.isReduceMotionEnabled` and mirrors it here.
-    private var motionScale: CGFloat {
-        let key = UserDefaults.standard.string(forKey: "settings.reduceMotion") ?? "off"
-        switch key {
-        case "off":      return 1.0     // full effects
-        case "reduced":  return 0.25    // dampened
-        case "disabled": return 0.0     // off entirely
-        default:         return 1.0
-        }
-    }
 }
