@@ -68,6 +68,17 @@ final class Projectile: SKNode {
     @available(*, unavailable)
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) not used") }
 
+    /// Attach a glowing world-space trail (Phase 2 VFX). Must be called after the projectile is
+    /// added to `world`, since the emitter's `targetNode` is set to the world so emitted particles
+    /// stay put and the shot streaks away from them. Primary shots trail lighter than heavy ones.
+    func attachTrail(in world: SKNode, scale: CGFloat) {
+        guard scale > 0 else { return }
+        let intensity: CGFloat = (definition.category == .primary ? 0.6 : 1.2) * scale
+        let trail = VFX.makeProjectileTrail(color: VFX.neonColor(for: firedBy), intensity: intensity)
+        trail.targetNode = world
+        addChild(trail)
+    }
+
     /// Returns false when the projectile should be removed from the scene
     /// (expired, left world bounds, or hit something).
     func update(dt: TimeInterval, world: CGRect) -> Bool {

@@ -19,7 +19,9 @@ final class JuiceSystem {
     /// never mid-match, and a fresh `JuiceSystem` is created with each `CombatScene`, so the
     /// value can't go stale during play. Caching avoids a `UserDefaults` read + `String`
     /// allocation on every shake / slow-mo / vignette / shockwave in the per-frame damage path.
-    private let motionScale: CGFloat = {
+    /// Exposed (read-only effectively — set once at init) so other visual systems like `VFX`
+    /// can honor the same Reduce-Motion setting without each re-reading `UserDefaults`.
+    let motionScale: CGFloat = {
         switch UserDefaults.standard.string(forKey: "settings.reduceMotion") ?? "off" {
         case "reduced":  return 0.25    // dampened
         case "disabled": return 0.0     // off entirely

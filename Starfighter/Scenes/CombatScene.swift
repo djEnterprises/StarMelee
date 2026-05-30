@@ -340,26 +340,22 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         enemyPrimary.tick(dt: dt)
         enemySecondary.tick(dt: dt)
         if canControlPlayer && firing1, let shot = playerPrimary.fire(from: playerShip) {
-            worldNode.addChild(shot)
-            activeProjectiles.append(shot)
+            launch(shot)
             HapticsSystem.shared.play(.primaryFire)
             AudioSystem.shared.play(.primaryFire)
         }
         if canControlPlayer && firing2, let shot = playerSecondary.fire(from: playerShip, target: enemyShip) {
-            worldNode.addChild(shot)
-            activeProjectiles.append(shot)
+            launch(shot)
             HapticsSystem.shared.play(.secondaryFire)
             AudioSystem.shared.play(.secondaryFire)
         }
         // AI weapon fires produce audio (audible in the arena) but never haptics — Section 13.
         if aiFirePrimary, let shot = enemyPrimary.fire(from: enemyShip) {
-            worldNode.addChild(shot)
-            activeProjectiles.append(shot)
+            launch(shot)
             AudioSystem.shared.play(.primaryFire)
         }
         if aiFireSecondary, let shot = enemySecondary.fire(from: enemyShip, target: playerShip) {
-            worldNode.addChild(shot)
-            activeProjectiles.append(shot)
+            launch(shot)
             AudioSystem.shared.play(.secondaryFire)
         }
         if aiDecision.fireSpecial {
@@ -468,6 +464,8 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             juice.spawnDestructionExplosion(at: playerShip.position,
                                             shipColor: SKColor(red: 0, green: 1.0, blue: 0.84, alpha: 1),
                                             in: worldNode)
+            VFX.spawnExplosion(at: playerShip.position, color: VFX.neonColor(for: .player),
+                               scale: juice.motionScale, in: worldNode)
             juice.slowMo(.shipDestruction)
             juice.shake(.heavy)
             juice.hitStop(GameFeel.hitStopKill)
@@ -480,6 +478,8 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
             juice.spawnDestructionExplosion(at: enemyShip.position,
                                             shipColor: SKColor(red: 1.0, green: 0.2, blue: 0.4, alpha: 1),
                                             in: worldNode)
+            VFX.spawnExplosion(at: enemyShip.position, color: VFX.neonColor(for: .opponent),
+                               scale: juice.motionScale, in: worldNode)
             juice.slowMo(.shipDestruction)
             juice.shake(.medium)
             juice.hitStop(GameFeel.hitStopKill)
@@ -800,6 +800,18 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         activePowerUps.removeAll { $0 === pu }
     }
 
+    /// Register a freshly-fired projectile: add it to the world + tracking list, fire a neon
+    /// muzzle flash, and attach a glowing world-space trail (Phase 2 VFX).
+    private func launch(_ shot: Projectile) {
+        worldNode.addChild(shot)
+        activeProjectiles.append(shot)
+        let heading = shot.zRotation + .pi / 2
+        VFX.spawnMuzzleFlash(at: shot.position, heading: heading,
+                             color: VFX.neonColor(for: shot.firedBy),
+                             scale: juice.motionScale, in: worldNode)
+        shot.attachTrail(in: worldNode, scale: juice.motionScale)
+    }
+
     private func handleProjectile(_ proj: Projectile, hitting target: Ship) {
         if proj.firedBy == target.side { return }
         let damage = proj.computeDamage(against: target)
@@ -807,6 +819,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         // Phase 1 game feel: a brief hit-stop scaled to damage gives the impact weight. Fires for
         // both sides (unlike haptics, which are player-only) — freezing the sim reads globally.
         juice.hitStop(GameFeel.hitStopDuration(forDamage: damage))
+        // Phase 2 VFX: neon impact sparks at the point of contact, tinted by the shooter.
+        VFX.spawnImpactSparks(at: proj.position, color: VFX.neonColor(for: proj.firedBy),
+                              scale: juice.motionScale, in: worldNode)
         // Section 17: track damage on the PLAYER's ship only (their leaderboard entry).
         if proj.firedBy == .player && target.side == .opponent {
             LeaderboardStore.shared.addDamageDealt(shipID: playerShip.definition.id, amount: Double(damage))

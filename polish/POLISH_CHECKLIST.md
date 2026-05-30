@@ -13,13 +13,13 @@ useful than an optimistic green.
 - [ ] Controls feel responsive (input buffering / coyote time present)  *(deferred — changes input logic)*
 - [x] All feel constants live in one tunable `GameFeel` file
 
-## Visual / VFX
-- [ ] Explosions are layered (flash + shockwave + debris + sparks + smoke), not single puffs
-- [ ] Weapons have muzzle flash, glowing projectiles/trails, and impact sparks
-- [ ] Additive blending + bloom on energy/engines/explosions
-- [ ] Multi-layer parallax background with nebula/depth
-- [ ] Cohesive color grade (LUT/vignette) — everything looks shot through one lens
-- [ ] Threats and pickups stay high-contrast and readable through all the juice
+## Visual / VFX — Phase 2 (particles) done 2026-05-30
+- [x] Explosions are layered (flash + shockwave + debris + sparks), not single puffs  *(white spark shower + tinted glowing debris on top of the shockwave rings)*
+- [x] Weapons have muzzle flash, glowing projectiles/trails, and impact sparks
+- [~] Additive blending + bloom on energy/engines/explosions  *(all particles additive-blended for glow; true post-process bloom via SKEffectNode/SKShader deferred)*
+- [ ] Multi-layer parallax background with nebula/depth  *(deferred — Phase 3 art direction)*
+- [ ] Cohesive color grade (LUT/vignette) — everything looks shot through one lens  *(deferred — Phase 3)*
+- [x] Threats and pickups stay high-contrast and readable through all the juice  *(additive glow tuned to stay legible)*
 
 ## Audio
 - [ ] Adaptive/layered music that responds to intensity
