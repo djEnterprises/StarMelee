@@ -16,7 +16,7 @@ useful than an optimistic green.
 ## Visual / VFX — Phase 2 (particles) done 2026-05-30
 - [x] Explosions are layered (flash + shockwave + debris + sparks), not single puffs  *(white spark shower + tinted glowing debris on top of the shockwave rings)*
 - [x] Weapons have muzzle flash, glowing projectiles/trails, and impact sparks
-- [~] Additive blending + bloom on energy/engines/explosions  *(all particles additive-blended for glow; true post-process bloom via SKEffectNode/SKShader deferred)*
+- [x] Additive blending + bloom on energy/engines/explosions  *(additive particles + additive glow halos behind ships & projectiles = localized bloom. NOTE: full-scene SKEffectNode/CIBloom is intentionally NOT used — the world is ~screen×16 (~13k px), so post-processing it each frame is a perf/memory non-starter; localized halos are the correct technique for a world this large.)*
 - [ ] Multi-layer parallax background with nebula/depth  *(deferred — Phase 3 art direction)*
 - [ ] Cohesive color grade (LUT/vignette) — everything looks shot through one lens  *(deferred — Phase 3)*
 - [x] Threats and pickups stay high-contrast and readable through all the juice  *(additive glow tuned to stay legible)*

@@ -50,6 +50,12 @@ final class Projectile: SKNode {
         visual.strokeColor = .white
         visual.glowWidth = 4
         visual.lineWidth = 0.5
+
+        // Additive glow halo behind the core so the shot blooms (Phase 2 VFX).
+        let glowRadius: CGFloat = definition.category == .primary ? 9 : 14
+        let glow = VFX.makeGlow(color: color, radius: glowRadius, alpha: 0.6)
+        glow.zPosition = -1
+        addChild(glow)
         addChild(visual)
 
         // Physics — slim circular body, no gravity, no rotation, contact-only.

@@ -174,6 +174,11 @@ final class Ship: SKNode {
         noseIndicator.zPosition = 1   // above hull
 
         super.init()
+        // Additive glow halo behind the hull — localized "bloom" so the neon silhouette blooms
+        // against dark space (Phase 2 VFX). Sits behind everything else on the ship.
+        let glow = VFX.makeGlow(color: color, radius: s2 * 1.9, alpha: 0.5)
+        glow.zPosition = -2
+        addChild(glow)
         addChild(shieldAura)
         addChild(thrusterFlare)
         addChild(hull)

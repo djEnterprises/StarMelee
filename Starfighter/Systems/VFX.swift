@@ -21,6 +21,23 @@ enum VFX {
             : SKColor(red: 1.0, green: 0.2, blue: 0.4,  alpha: 1.0)   // red
     }
 
+    // MARK: - Glow halo (localized "bloom")
+    //
+    // A true post-process CIBloom would require wrapping the world in an SKEffectNode — but this
+    // game's world is ~screen×16 (≈13k px), so rasterizing it each frame is a non-starter. Instead
+    // we fake bloom the way shipped neon games do: an additive-blended soft-dot sprite placed
+    // *behind* a bright object, so its edges blow out into a glow. Cheap, scales to any world size,
+    // and no per-frame cost. Parent it behind the object's core (negative zPosition).
+    static func makeGlow(color: SKColor, radius: CGFloat, alpha: CGFloat = 0.55) -> SKSpriteNode {
+        let glow = SKSpriteNode(texture: softDot)
+        glow.size = CGSize(width: radius * 2, height: radius * 2)
+        glow.color = color
+        glow.colorBlendFactor = 1
+        glow.blendMode = .add
+        glow.alpha = alpha
+        return glow
+    }
+
     // MARK: - Procedural soft-dot texture (built once)
 
     /// A radial-gradient "soft dot" — bright center fading to transparent. Used for every
