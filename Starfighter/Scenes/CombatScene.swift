@@ -16,6 +16,7 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
 
     // MARK: - Scene nodes
     private let worldNode = SKNode()
+    private var parallax: ParallaxBackground?
     private let cameraNode = SKCameraNode()
     private var playerShip: Ship!
     private var enemyShip: Ship!
@@ -119,28 +120,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func buildStarfield() {
-        let specs: [(count: Int, alphaRange: ClosedRange<CGFloat>, sizeRange: ClosedRange<CGFloat>)] = [
-            (600, 0.20...0.50, 0.4...1.0),
-            (300, 0.40...0.75, 0.7...1.6),
-            (120, 0.60...0.95, 1.2...2.4),
-        ]
-        for spec in specs {
-            let layer = SKNode()
-            layer.zPosition = -100
-            for _ in 0..<spec.count {
-                let r = CGFloat.random(in: spec.sizeRange) / 2
-                let star = SKShapeNode(circleOfRadius: r)
-                star.fillColor = .white
-                star.strokeColor = .clear
-                star.alpha = CGFloat.random(in: spec.alphaRange)
-                star.position = CGPoint(
-                    x: CGFloat.random(in: worldRect.minX...worldRect.maxX),
-                    y: CGFloat.random(in: worldRect.minY...worldRect.maxY)
-                )
-                layer.addChild(star)
-            }
-            worldNode.addChild(layer)
-        }
+        // Phase 3: camera-attached multi-layer parallax + nebula clouds (replaces the old flat
+        // world-space dots that rode the world 1:1 with no depth).
+        parallax = ParallaxBackground(camera: cameraNode, viewport: size)
     }
 
     private func buildPlanetField() {
@@ -427,6 +409,9 @@ final class CombatScene: SKScene, SKPhysicsContactDelegate {
         followTarget.y += (playerShip.position.y - cameraNode.position.y) * lerp
         // Clamp follow target to world before passing to juice (juice adds shake offset on top).
         followTarget = clampToCameraBounds(followTarget)
+        // Parallax background scrolls off the smoothed target (not the shaken camera) so it never
+        // inherits screen-shake jitter.
+        parallax?.update(cameraPosition: followTarget)
         juice.apply(dt: rawDt, to: cameraNode, cameraTargetPosition: followTarget)
 
         // Damage detection — shake + haptics + screen vignette on rising-edge health drops
